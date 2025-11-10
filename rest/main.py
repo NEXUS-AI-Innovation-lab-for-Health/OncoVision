@@ -46,6 +46,12 @@ sql_credentials = SQLCredentials(
     name=os.getenv("SQL_DATABASE", "database"),
 )
 sql_connection = SQLConnection(sql_credentials)
+try:
+    sql_session = sql_connection.connect()
+    logging.info("SQL database connection established successfully.")
+except Exception as e:
+    logging.error(f"Failed to establish SQL database connection: {e}")
+    exit(1)
 
 # Initialize s3 storage connection
 # Setup S3 Connection

@@ -1,6 +1,6 @@
 from fastapi import HTTPException, Request
 from fastapi.security.utils import get_authorization_scheme_param
-from sqlmodel import select
+from sqlmodel import select, func
 from hashlib import sha256
 from datetime import datetime
 
@@ -14,20 +14,29 @@ from models.user import User
 class AuthDependancy:
 
     sql_connection: SQLConnection
+    kind = str
 
-    def __init__(self, sql_connection: SQLConnection) -> None:
+    def __init__(self, sql_connection: SQLConnection, kind: str) -> None:
         self.sql_connection = sql_connection
+        self.kind = kind
 
     def _extract_token(self, request: Request) -> str | None:
         
-        auth: str | None = request.headers.get("Authorization")
-        if not auth:
-            return None
+        if self.kind == "header":
 
-        scheme, param = get_authorization_scheme_param(auth)
-        if scheme.lower() != "bearer":
-            return None
-        return param
+            auth =request.headers.get("Authorization")
+            if not auth:
+                return None
+
+            scheme, param = get_authorization_scheme_param(auth)
+            if scheme.lower() != "bearer":
+                return None
+            return param
+        
+        elif self.kind == "query":
+
+            token = request.query_params.get("token")
+            return token
     
     async def __call__(self, request: Request) -> User:
 
@@ -64,7 +73,48 @@ class AuthController(Controller):
     def __init__(self, sql_connection: SQLConnection) -> None:
         super().__init__("auth")
         self.sql_connection = sql_connection
+        self.add_api_route("/register", self.register, methods=["POST"], response_model=self.RegisterResponse)
         self.add_api_route("/login", self.login, methods=["POST"], response_model=self.LoginResponse)
+
+    # Register
+
+    class RegisterBody(CamelModel):
+        
+        name: str
+        last_name: str
+
+        email: str
+        password: str
+
+    class RegisterResponse(CamelModel):
+        
+        message: str
+
+    async def register(self, body: RegisterBody):
+
+        hashed_password = hash_password(body.password)
+        with self.sql_connection.create_session() as session:
+
+            statement = (
+                select(User)
+                .where(User.email == body.email)
+            )
+
+            existing_user = session.exec(statement).first()
+            if existing_user:
+                raise HTTPException(status_code=400, detail="Email already registered")
+            
+            user = User(
+                name=body.name,
+                last_name=body.last_name,
+                email=body.email,
+                password=hashed_password
+            )
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+
+            return self.RegisterResponse(message="User registered successfully")
 
     # Login
 
@@ -101,7 +151,7 @@ class AuthController(Controller):
                 .where(
                     (Token.user_id == user.id) &
                     (Token.ip_address == ip_address) &
-                    (~Token.has_expired())
+                    (Token.expires_at > func.now())
                 )
             )
 
