@@ -74,10 +74,10 @@ class File(CamelSQLModel, table=True):
         id: int = Field(default=None, primary_key=True)
         created_at: datetime = Field(default_factory=datetime.now, nullable=False)
 
+        access: Access = Field(nullable=False)
+
         updated_by: int = Field(foreign_key="users.id", nullable=False, ondelete="CASCADE")
         updated_at: datetime = Field(default_factory=datetime.now, nullable=False)
 
         file_id: int = Field(foreign_key="files.id", nullable=False, ondelete="CASCADE")
         user_id: int = Field(foreign_key="users.id", nullable=False, ondelete="CASCADE")
-
-        access: Access = Field(nullable=False)

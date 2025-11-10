@@ -15,5 +15,5 @@ class User(CamelSQLModel, table=True):
     email: str = Field(nullable=False, unique=True, index=True)
     password: str = Field(nullable=False)
 
-    profession: int = Field(foreign_key="professions.id", nullable=False)
+    profession_id: int = Field(foreign_key="professions.id", nullable=False)
     

@@ -8,7 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from database.sql.connection import SQLConnection, SQLCredentials
 from database.s3.connection import S3Connection, S3Credentials
+
 import models as _ # Load models
+
+# Import controllers
+from controllers.auth import AuthController
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -33,41 +37,42 @@ app.add_middleware(
     allow_credentials=True,
 )
 
-if __name__ == "__main__":
-    logging.info("Starting application...")
-    
-    # Setup SQL Database Connection
-    sql_credentials = SQLCredentials(
-        host=os.getenv("SQL_HOST", "localhost"),
-        port=int(os.getenv("SQL_PORT", 3306)),
-        user=os.getenv("SQL_USER", "user"),
-        password=os.getenv("SQL_PASSWORD", "password"),
-        name=os.getenv("SQL_DATABASE", "database"),
-    )
+# Initialize sql database connections
+sql_credentials = SQLCredentials(
+    host=os.getenv("SQL_HOST", "localhost"),
+    port=int(os.getenv("SQL_PORT", 3306)),
+    user=os.getenv("SQL_USER", "user"),
+    password=os.getenv("SQL_PASSWORD", "password"),
+    name=os.getenv("SQL_DATABASE", "database"),
+)
+sql_connection = SQLConnection(sql_credentials)
 
-    sql_connection = SQLConnection(sql_credentials)
-    try:
-        sql_connection.connect()
-        logging.info("Database connected successfully.")
-    except Exception as e:
-        logging.error(f"Failed to connect to the database: {e}")
-        exit(1)
+# Initialize s3 storage connection
+# Setup S3 Connection
+s3_credentials = S3Credentials(
+    host=os.getenv("S3_HOST", "http://localhost"),
+    port=int(os.getenv("S3_PORT", 9000)),
+    user=os.getenv("S3_USER", "user"),
+    password=os.getenv("S3_PASSWORD", "password"),
+    region=os.getenv("S3_REGION", "us-east-1"),
+)
+s3_connection = None
+try:
+    s3_connection = S3Connection(s3_credentials)
+    s3_session = s3_connection.create_session()
+    s3_session.ls("/")
+    logging.info("S3 connection established successfully.")
+except Exception as e:
+    logging.error(f"Failed to establish S3 connection: {e}")
+    exit(1)
 
-    # Setup S3 Connection
-    s3_credentials = S3Credentials(
-        host=os.getenv("S3_HOST", "http://localhost"),
-        port=int(os.getenv("S3_PORT", 9000)),
-        user=os.getenv("S3_USER", "user"),
-        password=os.getenv("S3_PASSWORD", "password"),
-        region=os.getenv("S3_REGION", "us-east-1"),
-    )
-    s3_connection = None
-    try:
-        s3_connection = S3Connection(s3_credentials)
-        logging.info("S3 connection established successfully.")
-    except Exception as e:
-        logging.error(f"Failed to establish S3 connection: {e}")
-        exit(1)
+routers = [
+    AuthController(sql_connection),
+]
+for router in routers:
+    app.include_router(router)
+    logging.info(f"Router '{router.prefix}' included.")
+logging.info(f"Total of {len(routers)} routers included.")
 
 if __name__ == "__main__":
     host = os.getenv("HOST", "127.0.0.1")

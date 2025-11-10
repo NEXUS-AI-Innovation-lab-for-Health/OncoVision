@@ -33,10 +33,10 @@ class Meeting(CamelSQLModel, table=True):
 
         id: int = Field(default=None, primary_key=True)
 
+        state: State = Field(default=State.PENDING, nullable=False)
+
         meeting_id: int = Field(foreign_key="meetings.id", nullable=False, ondelete="CASCADE")
         user_id: int = Field(foreign_key="users.id", nullable=False, ondelete="CASCADE")
-
-        state: State = Field(default=State.PENDING, nullable=False)
 
         def get_files(self, session: Session) -> list[Meeting.Member.Document]:
             statement = (
