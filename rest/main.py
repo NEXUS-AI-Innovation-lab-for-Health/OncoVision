@@ -7,6 +7,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from database.sql.connection import SQLConnection, SQLCredentials
+from database.s3.connection import S3Connection, S3Credentials
+import models as _ # Load models
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -32,7 +34,9 @@ app.add_middleware(
 )
 
 if __name__ == "__main__":
+    logging.info("Starting application...")
     
+    # Setup SQL Database Connection
     sql_credentials = SQLCredentials(
         host=os.getenv("SQL_HOST", "localhost"),
         port=int(os.getenv("SQL_PORT", 3306)),
@@ -47,6 +51,22 @@ if __name__ == "__main__":
         logging.info("Database connected successfully.")
     except Exception as e:
         logging.error(f"Failed to connect to the database: {e}")
+        exit(1)
+
+    # Setup S3 Connection
+    s3_credentials = S3Credentials(
+        host=os.getenv("S3_HOST", "http://localhost"),
+        port=int(os.getenv("S3_PORT", 9000)),
+        user=os.getenv("S3_USER", "user"),
+        password=os.getenv("S3_PASSWORD", "password"),
+        region=os.getenv("S3_REGION", "us-east-1"),
+    )
+    s3_connection = None
+    try:
+        s3_connection = S3Connection(s3_credentials)
+        logging.info("S3 connection established successfully.")
+    except Exception as e:
+        logging.error(f"Failed to establish S3 connection: {e}")
         exit(1)
 
 if __name__ == "__main__":
