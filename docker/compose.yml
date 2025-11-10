@@ -1,0 +1,50 @@
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: onco_sql
+    environment:
+      MYSQL_ROOT_PASSWORD: butinfo
+      MYSQL_DATABASE: onco_vision
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: vitrygtr
+    volumes:
+      - ./volumes/mysql:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      - onco_network
+
+  minio:
+    image: minio/minio
+    container_name: onco_minio
+    environment:
+      MINIO_ROOT_USER: root
+      MINIO_ROOT_PASSWORD: butinfo-vitrygtr
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ./volumes/minio:/data
+    networks:
+      - onco_network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: onco_phpmyadmin
+    environment:
+      PMA_HOST: mysql
+      MYSQL_ROOT_PASSWORD:  butinfo
+      UPLOAD_LIMIT: 300M
+    ports:
+      - "8081:80"
+    depends_on:
+      - mysql
+    networks:
+      - onco_network
+
+networks:
+  onco_network:
+    name: onco_network
+    driver: bridge
