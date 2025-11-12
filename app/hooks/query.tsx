@@ -1,6 +1,6 @@
-import { QueryKey, useQuery, UseQueryOptions, UseQueryResult } from "@tanstack/react-query";
+import { DefinedInitialDataOptions, QueryKey, useQuery, UseQueryResult } from "@tanstack/react-query";
 
-export type FineQueryType<TQueryFnData = unknown, TError = Error, TData = TQueryFnData, TQueryKey extends QueryKey = QueryKey> = Partial<UseQueryOptions<TQueryFnData, TError, TData, TQueryKey>> & {
+export type FineQueryType<TQueryFnData = unknown, TError = Error, TData = TQueryFnData, TQueryKey extends QueryKey = QueryKey> = Partial<DefinedInitialDataOptions<TQueryFnData, TError, TData, TQueryKey>> & {
     queryKey: TQueryKey,
 }
 

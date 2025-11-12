@@ -1,9 +1,19 @@
+import { RestProvider } from '@/hooks/rest';
 import { Stack } from 'expo-router';
 
 export default function RootLayout() {
 	return (
-		<Stack>
-			<Stack.Screen name="index" options={{ title: 'Home' }} />
-		</Stack>
+		<RestProvider
+			url="https://db0b1864933b.ngrok-free.app"
+		>
+			<Stack>
+				<Stack.Screen 
+					name="index" 
+					options={{ 
+						title: "Accueil" 
+					}} 
+				/>
+			</Stack>
+		</RestProvider>
 	);
 }

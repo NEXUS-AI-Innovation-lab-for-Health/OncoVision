@@ -13,6 +13,7 @@ import models as _ # Load models
 
 # Import controllers
 from controllers.auth import AuthController
+from controllers.meeting import MeetingController
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -74,6 +75,7 @@ except Exception as e:
 
 routers = [
     AuthController(sql_connection),
+    MeetingController(),
 ]
 for router in routers:
     app.include_router(router)
