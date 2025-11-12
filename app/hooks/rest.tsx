@@ -15,6 +15,11 @@ export interface Response<T = any> {
     content: T | null;
 }
 
+interface Token {
+    value?: string | null;
+    expiresAt?: string | null;
+}
+
 export type RestParam = {
     endpoint: string;
     auth?: boolean;
@@ -47,8 +52,10 @@ export type RestContextType = {
     useQuery: <T = any>(params: RestQueryType<T | null>) => UseQueryResult<T | null, Error>;
     useWebSocket: (props: RestUseSocketType) => UseWebSocketReturn;
 
-    token: string | null,
-    setToken: (token: string | null, duration?: number) => Promise<void>,
+    loading: boolean;
+
+    token: Token | null,
+    setToken: (token: Token | null) => Promise<void>,
     hasToken: () => boolean,
 
     get: <T = any>(params: RestGetParam) => RestReturnType<T>,
@@ -67,18 +74,25 @@ export function RestProvider(props: RestProviderProps) {
 
     const { url } = props;
     
-    const [token, _setToken] = useState<string | null>(null);
+    const [token, _setToken] = useState<Token | null>(null);
+    const [loading, setLoading] = useState<boolean>(true);
 
-    const setToken = async (token: string | null, duration?: number) => {
+    const setToken = async (token: Token | null) => {
         _setToken(token);
         if (token)
-            await AsyncStorage.setItem("access_token", token);
-        else 
+            await AsyncStorage.setItem("access_token", JSON.stringify(token));
+        else
             await AsyncStorage.removeItem("access_token");
     }
 
     const hasToken = () => {
-        return token !== null && token !== undefined && token !== "";
+        if(!token || !token.value)
+            return false;
+        if(token.expiresAt) {
+            const expiresAt = new Date(token.expiresAt);
+            return expiresAt > new Date();
+        }
+        return true;
     }
 
     function useQuery<T = any>(params: RestQueryType<T | null>): UseQueryResult<T | null, Error> {
@@ -183,17 +197,21 @@ export function RestProvider(props: RestProviderProps) {
 
     useEffect(() => {
         const loadToken = async () => {
+            setLoading(true);
             const storedToken = await AsyncStorage.getItem("access_token");
-            console.log("Loaded token from storage:", storedToken);
-            if (storedToken) 
-                _setToken(storedToken);
+            if (storedToken) {
+                const parsedToken: Token = JSON.parse(storedToken);
+                _setToken(parsedToken);
+            }
+            setLoading(false);
         }
         loadToken();
     }, []);
 
     const value: RestContextType = {
 
-        url: url,
+        url,
+        loading,
 
         token: token,
         setToken: setToken,
