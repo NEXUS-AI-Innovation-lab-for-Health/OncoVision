@@ -1,6 +1,5 @@
 import os
 import dotenv
-import logging
 
 import uvicorn
 from fastapi import FastAPI
@@ -13,16 +12,13 @@ import models as _ # Load models
 
 # Import controllers
 from controllers.auth import AuthController
-from controllers.meeting import MeetingController
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+from controllers.paint import PaintController
 
 # Load env. variables
 dotenv.load_dotenv()
 dev_env = os.getenv("ENVIRONMENT", "production").lower() == "dev"
 
-logging.info(f"Running as {'development' if dev_env else 'production'} environment.")
+print(f"Running as {'development' if dev_env else 'production'} environment.")
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -49,9 +45,9 @@ sql_credentials = SQLCredentials(
 sql_connection = SQLConnection(sql_credentials)
 try:
     sql_session = sql_connection.connect()
-    logging.info("SQL database connection established successfully.")
+    print("SQL database connection established successfully.")
 except Exception as e:
-    logging.error(f"Failed to establish SQL database connection: {e}")
+    print(f"Failed to establish SQL database connection: {e}")
     exit(1)
 
 # Initialize s3 storage connection
@@ -68,19 +64,19 @@ try:
     s3_connection = S3Connection(s3_credentials)
     s3_session = s3_connection.create_session()
     s3_session.ls("/")
-    logging.info("S3 connection established successfully.")
+    print("S3 connection established successfully.")
 except Exception as e:
-    logging.error(f"Failed to establish S3 connection: {e}")
+    print(f"Failed to establish S3 connection: {e}")
     exit(1)
 
 routers = [
     AuthController(sql_connection),
-    MeetingController(),
+    PaintController(),
 ]
 for router in routers:
     app.include_router(router)
-    logging.info(f"Router '{router.prefix}' included.")
-logging.info(f"Total of {len(routers)} routers included.")
+    print(f"Router '{router.prefix}' included.")
+print(f"Total of {len(routers)} routers included.")
 
 if __name__ == "__main__":
     host = os.getenv("HOST", "127.0.0.1")

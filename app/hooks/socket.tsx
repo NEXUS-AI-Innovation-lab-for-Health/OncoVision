@@ -5,7 +5,6 @@ type SocketMessageListener = (message: string) => void;
 
 export type UseWebSocketType = {
     url: string;
-    secure?: boolean;
     params?: Record<string, string> | null;
     autoConnect?: boolean;
 }
@@ -16,10 +15,10 @@ export type UseWebSocketReturn = {
     connect: () => void;
     disconnect: () => void;
 
-    sendMessage: (message: string) => boolean;
+    sendMessage: (message: string | object) => boolean;
 
-    registerListener: (listener: SocketMessageListener) => void;
-    unregisterListener: (listener: SocketMessageListener) => void;
+    registerListener: (id: string, listener: SocketMessageListener) => void;
+    unregisterListener: (id: string) => void;
 
     setOnConnect: (listener: SocketConnectListener | undefined) => void;
     setOnDisconnect: (listener: SocketConnectListener | undefined) => void;
@@ -35,8 +34,8 @@ export const useWebSocket = (props: UseWebSocketType): UseWebSocketReturn => {
     const [autoConnect, setAutoConnect] = useState<boolean>(initialAutoConnect);
     const [isConnected, setIsConnected] = useState<boolean>(false);
 
-    const [queue, setQueue] = useState<string[]>([]);
-    const [listeners, setListeners] = useState<Set<SocketMessageListener>>(new Set());
+    const [queue, setQueue] = useState<(object | string)[]>([]);
+    const [listeners, setListeners] = useState<Record<string, SocketMessageListener>>({});
 
     const onConnectRef = useRef<SocketConnectListener | undefined>(undefined);
     const onDisconnectRef = useRef<SocketConnectListener | undefined>(undefined);
@@ -89,20 +88,20 @@ export const useWebSocket = (props: UseWebSocketType): UseWebSocketReturn => {
         const completeUrl = url + (params ? `?${new URLSearchParams(params).toString()}` : '');
         console.log("Connecting to WebSocket URL:", completeUrl);
         
-        const ws = new WebSocket(completeUrl, {
-            headers: {
-                'User-Agent': 'SAE-Mobile-App/1.0'
-            }
-        } as any);
+        const ws = new WebSocket(completeUrl);
         
         ws.onopen = () => {
+
+            console.log("WebSocket connected to:", completeUrl);
+
             connectionAttemptRef.current = false;
             setIsConnected(true);
 
             const currentQueue = queueRef.current;
             if (currentQueue.length > 0) {
                 for (const message of currentQueue) {
-                    ws.send(message);
+                    const json = typeof message === 'object' ? JSON.stringify(message) : message;
+                    ws.send(json);
                 }
                 setQueue([]);
             }
@@ -115,7 +114,7 @@ export const useWebSocket = (props: UseWebSocketType): UseWebSocketReturn => {
         ws.onmessage = (event) => {
             const message = event.data;
             const currentListeners = listenersRef.current;
-            for (const listener of currentListeners) {
+            for (const listener of Object.values(currentListeners)) {
                 listener(message);
             }
         };
@@ -148,9 +147,10 @@ export const useWebSocket = (props: UseWebSocketType): UseWebSocketReturn => {
         wsRef.current = ws;
     }, [url, params]);
 
-    const sendMessage = useCallback((message: string): boolean => {
+    const sendMessage = useCallback((message: string | object): boolean => {
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-            wsRef.current.send(message);
+            const msg = typeof message === 'object' ? JSON.stringify(message) : message;
+            wsRef.current.send(msg);
             return true;
         }
 
@@ -189,14 +189,14 @@ export const useWebSocket = (props: UseWebSocketType): UseWebSocketReturn => {
         }
     }, [disconnect]);
 
-    const registerListener = useCallback((socketListener: SocketMessageListener) => {
-        setListeners((prevListeners) => new Set([...prevListeners, socketListener]));
+    const registerListener = useCallback((id: string, listener: SocketMessageListener) => {
+        setListeners((prev) => ({ ...prev, [id]: listener }));
     }, []);
 
-    const unregisterListener = useCallback((socketListener: SocketMessageListener) => {
-        setListeners((prevListeners) => {
-            const newListeners = new Set(prevListeners);
-            newListeners.delete(socketListener);
+    const unregisterListener = useCallback((id: string) => {
+        setListeners((prev) => {
+            const newListeners = { ...prev };
+            delete newListeners[id];
             return newListeners;
         });
     }, []);
