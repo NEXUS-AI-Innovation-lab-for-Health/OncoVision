@@ -5,7 +5,8 @@ const tintColorDark = '#2F81F7'; // bleu vif utilisé pour les boutons "Rejoindr
 
 export const Colors = {
 	light: {
-		text: '#1C1C1E',
+		//text: '#1C1C1E',
+		text: tintColorLight,
 		background: '#F7F8FA',
 		card: '#FFFFFF',
 		tint: tintColorLight,
@@ -19,7 +20,7 @@ export const Colors = {
 		warning: '#FACC15',
 	},
 	dark: {
-		text: '#F3F4F6',
+		text: tintColorDark,
 		subText: '#A1A1AA',
 		background: '#0E1116',
 		card: '#1C1F26',

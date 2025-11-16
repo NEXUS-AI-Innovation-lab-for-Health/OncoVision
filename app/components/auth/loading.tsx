@@ -26,13 +26,13 @@ export default function AuthLoading(props: AuthLoadingProps) {
             style={styles.container}
         >
             <Text
-                style={[styles.text, { color: colors.tint }]}
+                style={[styles.text, { color: colors.text }]}
             >
                 Chargement de vos données
             </Text>
             <ActivityIndicator
                 size="large"
-                color={colors.tint}
+                color={colors.text}
                 style={styles.indicator}
             />
         </View>

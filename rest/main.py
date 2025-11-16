@@ -12,7 +12,6 @@ import models as _ # Load models
 
 # Import controllers
 from controllers.auth import AuthController
-from controllers.paint import PaintController
 
 # Load env. variables
 dotenv.load_dotenv()
@@ -71,7 +70,6 @@ except Exception as e:
 
 routers = [
     AuthController(sql_connection),
-    PaintController(),
 ]
 for router in routers:
     app.include_router(router)
