@@ -6,7 +6,7 @@ export default function RootLayout() {
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>
 			<RestProvider
-				url="https://d0d4f633a709.ngrok-free.app"
+				url="http://localhost:8000/"
 			>
 				<Stack>
 					<Stack.Screen 

@@ -1,5 +1,5 @@
 import AuthLoading from '@/components/auth/loading';
-import AuthOffline from '@/components/auth/offline';
+import Canva from '@/components/drawing/canva';
 import { useRest } from '@/hooks/rest';
 
 export default function HomeScreen() {
@@ -10,7 +10,7 @@ export default function HomeScreen() {
 		return <AuthLoading />;
 
 	if (!token)
-		return <AuthOffline />
+		return <Canva />; //<AuthOffline />
 
 	return null;
 }

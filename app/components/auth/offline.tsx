@@ -1,7 +1,6 @@
 import { useTheme } from "@/hooks/theme";
 import { StyleSheet, Text, View } from "react-native";
 import ColoredButton from "../ui/button";
-import AuthLogin from "./login";
 
 const styles = StyleSheet.create({
     container: {
@@ -35,8 +34,8 @@ export default function AuthOffline(props: AuthOfflineProps) {
             <ColoredButton
                 title="Me connecter"
             />
-            <AuthLogin
-            />
+            {/*<AuthLogin
+            />*/}
         </View>
     )
 }
