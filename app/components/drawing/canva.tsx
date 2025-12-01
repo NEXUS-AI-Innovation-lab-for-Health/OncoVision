@@ -14,6 +14,12 @@ export default function Canva() {
     const [preview, setPreview] = useState<Shape | null>(null);
 
     const onSelect = (newCursor: CursorType | null) => {
+        if (cursorRef.current) {
+            const finished = cursorRef.current.finish(true);
+            if (finished) {
+                setShapes(prev => [...prev, finished]);
+            }
+        }
         switch (newCursor) {
             case 'line':
                 setCursor(new LineCursor());
@@ -61,11 +67,14 @@ export default function Canva() {
 
             onPanResponderRelease: (e: GestureResponderEvent) => {
                 const p: { x: number; y: number } = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY };
-                const created = cursorRef.current?.release(p);
+                cursorRef.current?.release(p);
+                const created = cursorRef.current?.finish(false);
                 if (created) {
                     setShapes(prev => [...prev, created]);
+                    setPreview(null);
+                } else {
+                    setPreview(cursorRef.current?.createPreview() || null);
                 }
-                setPreview(null);
             }
         })
     ).current;
