@@ -1,11 +1,9 @@
-import { useRest } from "@/hooks/rest";
 import { CircleCursor, CursorType, DrawingCursor, EllipseCursor, LineCursor, PensilCursor, PolygonCursor, RectangleCursor } from "@/types/drawing/cursor";
 import { Shape } from "@/types/drawing/form";
-import { DrawShapeMessage, HandshakeMessage } from "@/types/drawing/message";
-import React, { useEffect, useRef, useState } from "react";
-import { GestureResponderEvent, PanResponder, Text, View } from "react-native";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { GestureResponderEvent, PanResponder, View } from "react-native";
 import Svg from 'react-native-svg';
-import ToolBox from "./toolbox";
+import ToolBox from "./toolbox/bar";
 
 export default function Canva() {
 
@@ -15,13 +13,12 @@ export default function Canva() {
     const [shapes, setShapes] = useState<Shape[]>([]);
     const [preview, setPreview] = useState<Shape | null>(null);
 
-    const { useWebSocket } = useRest();
+    /*const { useWebSocket } = useRest();
     const { isConnected, connect, sendMessage, setOnConnect, registerListener, unregisterListener } = useWebSocket({
         url: "drawing/ws"
     });
 
     const sendShape = (shape: Shape) => {
-        console.log("Sending shape:", shape);
         sendMessage(JSON.stringify({
             type: "draw",
             shape: shape
@@ -48,7 +45,7 @@ export default function Canva() {
         return () => {
             unregisterListener("handshake");
         }
-    }, []);
+    }, []);*/
 
     const onSelect = (newCursor: CursorType | null) => {
         if (cursorRef.current) {
@@ -109,7 +106,7 @@ export default function Canva() {
                 if (created) {
                     setShapes(prev => [...prev, created]);
                     setPreview(null);
-                    sendShape(created);
+                    //sendShape(created);
                 } else {
                     setPreview(cursorRef.current?.createPreview() || null);
                 }
@@ -125,11 +122,10 @@ export default function Canva() {
             }} 
             {...panResponder.panHandlers}
         >
-            <Text>Nombre de formes : {shapes.length}</Text>
             {/* Render shapes and preview with Svg */}
             <Svg width="100%" height="100%" style={{ position: 'absolute', top: 0, left: 0 }}>
                 {shapes.map((s, index) => (
-                    <React.Fragment key={index}>{s.render()}</React.Fragment>
+                    <Fragment key={index}>{s.render()}</Fragment>
                 ))}
                 {preview?.render()}
             </Svg>

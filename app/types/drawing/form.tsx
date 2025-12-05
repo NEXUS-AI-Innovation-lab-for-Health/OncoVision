@@ -21,7 +21,7 @@ export abstract class Shape {
     }
 
     static fromJson(json: string): Shape {
-        const data = JSON.parse(json);
+        const data = JSON.parse(json) as { type: string };
         switch (data.type) {
             case "line":
                 console.log("Parsing Line shape from JSON:", data);

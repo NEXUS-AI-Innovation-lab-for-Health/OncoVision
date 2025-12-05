@@ -6,6 +6,8 @@ import AntDesign from '@expo/vector-icons/AntDesign';
 import Entypo from '@expo/vector-icons/Entypo';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import BucketToolBoxButton from "./bucket";
+import CursorToolBoxButton from './cursor';
 
 export type ToolBoxProps = {
     direction?: "horizontal" | "vertical";
@@ -92,18 +94,17 @@ export default function ToolBox(props: ToolBoxProps) {
                 {TOOLS.map((tool) => {
                     const isSelected = selected === tool.id;
                     return (
-                        <TouchableOpacity
+                        <CursorToolBoxButton
                             key={tool.id}
-                            style={[
-                                styles.toolButton,
-                                isSelected && styles.toolButtonSelected
-                            ]}
-                            onPress={() => onSelect?.(tool.id as CursorType)}
-                        >
-                            {tool.icon(isSelected ? "#fff" : "#9ca3af", isHorizontal)}
-                        </TouchableOpacity>
+                            icon={tool.icon(isSelected ? '#fff' : '#9ca3af', isHorizontal)}
+                            cursorType={tool.id as CursorType}
+                            selected={isSelected}
+                            onPress={(type) => onSelect?.(type)}
+                            isHorizontal={isHorizontal}
+                        />
                     );
                 })}
+                <BucketToolBoxButton />
             </View>
 
             
@@ -113,7 +114,10 @@ export default function ToolBox(props: ToolBoxProps) {
             
             <TouchableOpacity 
                 onPress={() => setDisplayed(false)} 
-                style={styles.closeButton}
+                style={[
+                    styles.closeButton,
+                    isHorizontal ? styles.closeButtonHorizontal : styles.closeButtonVertical
+                ]}
             >
                 <Ionicons 
                     name={isHorizontal ? "chevron-down" : "chevron-forward"} 
@@ -210,5 +214,11 @@ const styles = StyleSheet.create({
         padding: 4,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    closeButtonHorizontal: {
+        marginLeft: 8,
+    },
+    closeButtonVertical: {
+        marginTop: 12,
     },
 });

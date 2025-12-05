@@ -6,7 +6,6 @@ from typing import IO
 
 from PIL import Image, ImageOps
 
-
 def _open_image(input_image: Image.Image | str | Path | bytes | IO[bytes]) -> Image.Image:
     
     if isinstance(input_image, Image.Image):
@@ -30,7 +29,6 @@ def convert_image(
     dest_format: str = "PNG",
     frame: int | None = None,
     all_frames: bool = False,
-    quality: int = 95,
     background_color: tuple[int, int, int] = (255, 255, 255),
 ) -> Image.Image | list[Image.Image]:
     
