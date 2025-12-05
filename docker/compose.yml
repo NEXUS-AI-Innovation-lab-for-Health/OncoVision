@@ -38,9 +38,23 @@ services:
       MYSQL_ROOT_PASSWORD:  butinfo
       UPLOAD_LIMIT: 300M
     ports:
-      - "8081:80"
+      - "8080:80"
     depends_on:
       - mysql
+    networks:
+      - onco_network
+
+  mongodb:
+    image: mongo:8.2.1
+    container_name: onco_mongo
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=butinfo
+      - MONGO_INITDB_DATABASE=onco_vision
+    volumes:
+      - ./volumes/mongo:/data/db
+    ports:
+      - "27017:27017"
     networks:
       - onco_network
 

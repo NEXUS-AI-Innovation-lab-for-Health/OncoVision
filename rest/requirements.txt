@@ -7,3 +7,5 @@ cryptography
 python-dotenv
 s3fs
 websockets
+Pillow
+PyMongo

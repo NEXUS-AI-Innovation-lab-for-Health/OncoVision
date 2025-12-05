@@ -7,11 +7,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from database.sql.connection import SQLConnection, SQLCredentials
 from database.s3.connection import S3Connection, S3Credentials
+from database.mongo.connection import MongoConnection, MongoCredentials
 
 import models as _ # Load models
 
 # Import controllers
 from controllers.auth import AuthController
+from controllers.drawing import DrawingController
 
 # Load env. variables
 dotenv.load_dotenv()
@@ -68,8 +70,28 @@ except Exception as e:
     print(f"Failed to establish S3 connection: {e}")
     exit(1)
 
+# Initialize MongoDB connection
+mongo_credentials = MongoCredentials(
+    host=os.getenv("MONGO_HOST", "localhost"),
+    port=int(os.getenv("MONGO_PORT", 27017)),
+    user=os.getenv("MONGO_USER", "user"),
+    password=os.getenv("MONGO_PASSWORD", "password"),
+    database=os.getenv("MONGO_DATABASE", "database"),
+)
+mongo_connection = None
+try:
+    mongo_connection = MongoConnection(mongo_credentials)
+    if mongo_connection.ping():
+        print("MongoDB connection established successfully.")
+    else:
+        raise Exception("Ping to MongoDB server failed.")
+except Exception as e:
+    print(f"Failed to establish MongoDB connection: {e}")
+    exit(1)
+
 routers = [
     AuthController(sql_connection),
+    DrawingController(),
 ]
 for router in routers:
     app.include_router(router)

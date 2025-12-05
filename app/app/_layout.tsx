@@ -6,7 +6,7 @@ export default function RootLayout() {
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>
 			<RestProvider
-				url="http://localhost:8000/"
+				url="http://localhost:8000"
 			>
 				<Stack>
 					<Stack.Screen 
