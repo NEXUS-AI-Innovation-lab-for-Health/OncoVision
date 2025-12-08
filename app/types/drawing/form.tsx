@@ -24,22 +24,16 @@ export abstract class Shape {
         const data = JSON.parse(json) as { type: string };
         switch (data.type) {
             case "line":
-                console.log("Parsing Line shape from JSON:", data);
                 return Line.fromJson(json);
             case "circle":
-                console.log("Parsing Circle shape from JSON:", data);
                 return Circle.fromJson(json);
             case "ellipse":
-                console.log("Parsing Ellipse shape from JSON:", data);
                 return Ellipse.fromJson(json);
             case "rectangle":
-                console.log("Parsing Rectangle shape from JSON:", data);
                 return Rectangle.fromJson(json);
             case "polygon":
-                console.log("Parsing Polygon shape from JSON:", data);
                 return Polygon.fromJson(json);
             case "polyline":
-                console.log("Parsing Polyline shape from JSON:", data);
                 return Polyline.fromJson(json);
             default:
                 throw new Error(`Unknown shape type: ${data.type}`);

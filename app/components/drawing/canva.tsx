@@ -1,5 +1,9 @@
+import { useRest } from "@/hooks/rest";
+import { UseWebSocketReturn } from "@/hooks/socket";
 import { CircleCursor, CursorType, DrawingCursor, EllipseCursor, LineCursor, PensilCursor, PolygonCursor, RectangleCursor } from "@/types/drawing/cursor";
 import { Shape } from "@/types/drawing/form";
+import { HandshakeMessage } from "@/types/drawing/message";
+import { subscribe, WebSocketBus } from "@/utils/websocket";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { GestureResponderEvent, PanResponder, View } from "react-native";
 import Svg from 'react-native-svg';
@@ -13,39 +17,37 @@ export default function Canva() {
     const [shapes, setShapes] = useState<Shape[]>([]);
     const [preview, setPreview] = useState<Shape | null>(null);
 
-    /*const { useWebSocket } = useRest();
-    const { isConnected, connect, sendMessage, setOnConnect, registerListener, unregisterListener } = useWebSocket({
+    const { useWebSocket } = useRest();
+    const ws = useWebSocket({
         url: "drawing/ws"
     });
+    const webSocketBus = useRef<WebSocketBus>(new WebSocketBus(ws));
+
+    class CanvaHandler {
+
+        @subscribe("handshake")
+        handshake(socket: UseWebSocketReturn, raw_message: object): void {
+            const message: HandshakeMessage = raw_message as HandshakeMessage;
+            for(const shape of message.shapes) {
+                const jsonShape = JSON.stringify(shape);
+                const parsedShape = Shape.fromJson(jsonShape);
+                setShapes(prev => [...prev, parsedShape]);
+            }
+        }
+
+    }
 
     const sendShape = (shape: Shape) => {
-        sendMessage(JSON.stringify({
-            type: "draw",
+        ws.sendMessage({
+            type: "add_shape",
             shape: shape
-        } as DrawShapeMessage
-        ));
+        });
     }
 
     useEffect(() => {
-
-        registerListener("handshake", (data: string) => {
-            const parsed = JSON.parse(data) as HandshakeMessage;
-            const parsedShapes = parsed.shapes.map(s => Shape.fromJson(JSON.stringify(s)));
-            console.log("Received handshake with shapes:", parsedShapes);
-            console.log("Shapes details:", parsedShapes.map(s => ({ type: s.getType, points: (s as any).points, borderColor: (s as any).borderColor, borderWidth: (s as any).borderWidth })));
-            setShapes(parsedShapes);
-        });
-
-        setOnConnect(() => {
-            console.log("WebSocket connected, sending handshake");
-        });
-
-        connect();
-
-        return () => {
-            unregisterListener("handshake");
-        }
-    }, []);*/
+        webSocketBus.current.register(new CanvaHandler());
+        return webSocketBus.current.attach();
+    }, []);
 
     const onSelect = (newCursor: CursorType | null) => {
         if (cursorRef.current) {
@@ -106,7 +108,7 @@ export default function Canva() {
                 if (created) {
                     setShapes(prev => [...prev, created]);
                     setPreview(null);
-                    //sendShape(created);
+                    sendShape(created);
                 } else {
                     setPreview(cursorRef.current?.createPreview() || null);
                 }

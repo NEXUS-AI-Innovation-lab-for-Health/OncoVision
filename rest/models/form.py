@@ -44,3 +44,12 @@ class Polyline(Shape, Bordered):
     points: list[Point] = []
 
 ShapeUnion = Annotated[Union[Line, Circle, Ellipse, Rectangle, Polygon, Polyline], Field(discriminator="type")]
+
+FORMS = {
+    "line": Line,
+    "circle": Circle,
+    "ellipse": Ellipse,
+    "rectangle": Rectangle,
+    "polygon": Polygon,
+    "polyline": Polyline,
+}
