@@ -1,5 +1,6 @@
 import { CircleCursor, CursorType, DrawingCursor, EllipseCursor, LineCursor, PensilCursor, PolygonCursor, RectangleCursor } from "./cursor";
 import { Shape } from "./form";
+import ZoomController from "./zoom";
 
 export type ToolBoxAction = 'draw' | 'zoom';
 
@@ -16,6 +17,7 @@ export default class ToolBarController {
     private preview: Shape | null = null;
     
     private action: ToolBoxAction = 'draw';
+    private zoom: ZoomController;
 
     private cursorListeners: CursorChangeListener[] = [];
     private shapeCreatedListeners: ShapeCreatedListener[] = [];
@@ -25,6 +27,7 @@ export default class ToolBarController {
 
     constructor() {
         this.setCursor('pensil');
+        this.zoom = new ZoomController();
     }
 
     setCursor(cursor: DrawingCursor | CursorType | null) {
@@ -97,6 +100,10 @@ export default class ToolBarController {
 
     getAction(): ToolBoxAction {
         return this.action;
+    }
+
+    getZoom(): ZoomController {
+        return this.zoom;
     }
 
     setAction(action: ToolBoxAction) {
