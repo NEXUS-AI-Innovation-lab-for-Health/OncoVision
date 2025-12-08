@@ -2,7 +2,7 @@ from fastapi import WebSocket
 
 from api.websocket import WebSocketHandler, WebSocketMessage, websocket_subscribe
 from api.controller import Controller
-from models.form import Shape, ShapeUnion, FORMS
+from models.form import Shape, Bordered, ShapeUnion, FORMS
 
 import random
 
@@ -45,19 +45,21 @@ class DrawingController(Controller, WebSocketHandler):
             if s in ignored_sockets:
                 continue
 
-            self.send_shapes(s)
+            await self.send_shapes(s)
 
     async def send_shapes(self, socket: WebSocket) -> None:
 
         total_shapes = []
         for a in self.canva.artists.values():
-            total_shapes.extend(a.shapes)
+            for shape in a.shapes:
+                if isinstance(shape, Bordered):
+                    shape.border_color = a.color
+                total_shapes.append(shape)
         handshake_message = HandshakeMessage(shapes=total_shapes)
         await socket.send_json(handshake_message.model_dump(by_alias=True))
 
     @websocket_subscribe("add_shape", AddShapeMessage)
     async def add_shape(self, socket: WebSocket, message: AddShapeMessage) -> None:
-        print("Add shape called")
         artist = self.canva.artists.get(socket)
         if not artist:
             return

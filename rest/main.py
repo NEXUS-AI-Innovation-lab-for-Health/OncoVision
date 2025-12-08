@@ -63,7 +63,7 @@ s3_credentials = S3Credentials(
 s3_connection = None
 try:
     s3_connection = S3Connection(s3_credentials)
-    s3_session = s3_connection.create_session()
+    s3_session = s3_connection.get_session()
     s3_session.ls("/")
     print("S3 connection established successfully.")
 except Exception as e:

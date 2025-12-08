@@ -15,5 +15,5 @@ class S3Connection:
             }
         )
 
-    def create_session(self) -> S3FileSystem:
+    def get_session(self) -> S3FileSystem:
         return self.file_system
