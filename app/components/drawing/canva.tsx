@@ -3,7 +3,7 @@ import { UseWebSocketReturn } from "@/hooks/socket";
 import { DrawingCursor } from "@/types/drawing/cursor";
 import { Shape } from "@/types/drawing/form";
 import { HandshakeMessage } from "@/types/drawing/message";
-import ToolbarController from "@/types/drawing/toolbar";
+import ToolBarController, { ToolBoxAction } from "@/types/drawing/toolbar";
 import { subscribe, WebSocketBus } from "@/utils/websocket";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { GestureResponderEvent, PanResponder, View } from "react-native";
@@ -12,12 +12,13 @@ import ToolBoxBar from "./toolbox/bar";
 
 export default function Canva() {
 
-    const controller = useRef<ToolbarController>(new ToolbarController());
+    const controller = useRef<ToolBarController>(new ToolBarController());
     const [cursor, setCursor] = useState<DrawingCursor | null>(controller.current.getCursor());
     const cursorRef = useRef(cursor);
 
     const [shapes, setShapes] = useState<Shape[]>(controller.current.getShapes());
     const [preview, setPreview] = useState<Shape | null>(controller.current.getPreview());
+    const [action, setAction] = useState<ToolBoxAction>(controller.current.getAction());
 
     const { useWebSocket } = useRest();
     const ws = useWebSocket({
@@ -55,6 +56,7 @@ export default function Canva() {
         const unsubscribeCursor = controller.current.onCursorChange(setCursor);
         const unsubscribeShapes = controller.current.onShapesChange(setShapes);
         const unsubscribePreview = controller.current.onPreviewChange(setPreview);
+        const unsubscribeAction = controller.current.onActionChange(setAction);
         const unsubscribeShape = controller.current.onShapeCreated((shape) => {
             sendShape(shape);
         });
@@ -63,6 +65,7 @@ export default function Canva() {
             unsubscribeCursor();
             unsubscribeShapes();
             unsubscribePreview();
+            unsubscribeAction();
             unsubscribeShape();
         };
     }, []);
@@ -76,21 +79,42 @@ export default function Canva() {
             onStartShouldSetPanResponder: () => true,
 
             onPanResponderStart: (e: GestureResponderEvent) => {
+
+                if(controller.current.getAction() !== "draw")
+                    return;
+
+                if(!cursorRef.current) 
+                    return;
+
                 const p: { x: number; y: number } = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY };
-                cursorRef.current?.press(p);
-                controller.current.setPreview(cursorRef.current?.createPreview() || null);
+                cursorRef.current.press(p);
+                controller.current.setPreview(cursorRef.current.createPreview() || null);
             },
 
             onPanResponderMove: (e: GestureResponderEvent) => {
+
+                if(controller.current.getAction() !== "draw")
+                    return;
+
+                if(!cursorRef.current) 
+                    return;
+
                 const p: { x: number; y: number } = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY };
-                cursorRef.current?.move(p);
-                controller.current.setPreview(cursorRef.current?.createPreview() || null);
+                cursorRef.current.move(p);
+                controller.current.setPreview(cursorRef.current.createPreview() || null);
             },
 
             onPanResponderRelease: (e: GestureResponderEvent) => {
+
+                if(controller.current.getAction() !== "draw")
+                    return;
+
+                if(!cursorRef.current) 
+                    return;
+                
                 const p: { x: number; y: number } = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY };
-                cursorRef.current?.release(p);
-                const created = cursorRef.current?.finish(false);
+                cursorRef.current.release(p);
+                const created = cursorRef.current.finish(false);
                 if (created) {
                     controller.current.addShape(created);
                     controller.current.setPreview(null);

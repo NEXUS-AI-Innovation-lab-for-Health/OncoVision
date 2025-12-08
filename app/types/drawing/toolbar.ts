@@ -7,8 +7,9 @@ type CursorChangeListener = (cursor: DrawingCursor | null) => void;
 type ShapeCreatedListener = (shape: Shape) => void;
 type ShapesChangeListener = (shapes: Shape[]) => void;
 type PreviewChangeListener = (preview: Shape | null) => void;
+type ActionChangeListener = (action: ToolBoxAction) => void;
 
-export default class ToolbarController {
+export default class ToolBarController {
     
     private cursor: DrawingCursor | null = null;
     private shapes: Shape[] = [];
@@ -20,6 +21,7 @@ export default class ToolbarController {
     private shapeCreatedListeners: ShapeCreatedListener[] = [];
     private shapesChangeListeners: ShapesChangeListener[] = [];
     private previewChangeListeners: PreviewChangeListener[] = [];
+    private actionChangeListeners: ActionChangeListener[] = [];
 
     constructor() {
         this.setCursor('pensil');
@@ -99,12 +101,20 @@ export default class ToolbarController {
 
     setAction(action: ToolBoxAction) {
         this.action = action;
+        this.notifyActionChange();
     }
 
     onCursorChange(listener: CursorChangeListener) {
         this.cursorListeners.push(listener);
         return () => {
             this.cursorListeners = this.cursorListeners.filter(l => l !== listener);
+        }
+    }
+
+    onActionChange(listener: ActionChangeListener) {
+        this.actionChangeListeners.push(listener);
+        return () => {
+            this.actionChangeListeners = this.actionChangeListeners.filter(l => l !== listener);
         }
     }
 
@@ -143,6 +153,10 @@ export default class ToolbarController {
 
     private notifyPreviewChange() {
         this.previewChangeListeners.forEach(l => l(this.preview));
+    }
+
+    private notifyActionChange() {
+        this.actionChangeListeners.forEach(l => l(this.action));
     }
 
 }

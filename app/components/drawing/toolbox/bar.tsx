@@ -2,17 +2,16 @@ import { CursorType } from "@/types/drawing/cursor";
 import { useEffect, useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 
-import ToolbarController from "@/types/drawing/toolbar";
+import ToolBarController from "@/types/drawing/toolbar";
 import AntDesign from '@expo/vector-icons/AntDesign';
 import Entypo from '@expo/vector-icons/Entypo';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import CursorToolBoxButton from './cursor';
-import FillToolBoxButton from "./fill";
 import ZoomToolBoxButton from "./zoom";
 
 export type ToolBoxBarProps = {
-    controller: ToolbarController;
+    controller: ToolBarController;
     direction?: "horizontal" | "vertical";
 }
 
@@ -61,9 +60,15 @@ export default function ToolBoxBar(props: ToolBoxBarProps) {
     const { controller, direction = "horizontal" } = props;
     const [displayed, setDisplayed] = useState<boolean>(true);
     const [currentCursor, setCurrentCursor] = useState(controller.getCursor());
+    const [currentAction, setCurrentAction] = useState(controller.getAction());
 
     useEffect(() => {
-        return controller.onCursorChange(setCurrentCursor);
+        const unsubscribeCursor = controller.onCursorChange(setCurrentCursor);
+        const unsubscribeAction = controller.onActionChange(setCurrentAction);
+        return () => {
+            unsubscribeCursor();
+            unsubscribeAction();
+        }
     }, [controller]);
 
     const isHorizontal = direction === "horizontal";
@@ -98,7 +103,7 @@ export default function ToolBoxBar(props: ToolBoxBarProps) {
                 isHorizontal ? styles.toolsContainerHorizontal : styles.toolsContainerVertical
             ]}>
                 {TOOLS.map((tool) => {
-                    const isSelected = currentCursor?.getType() === tool.id;
+                    const isSelected = currentAction === 'draw' && currentCursor?.getType() === tool.id;
                     return (
                         <CursorToolBoxButton
                             key={tool.id}
@@ -113,8 +118,11 @@ export default function ToolBoxBar(props: ToolBoxBarProps) {
                         />
                     );
                 })}
-                <FillToolBoxButton />
-                <ZoomToolBoxButton />
+                {/*<FillToolBoxButton />*/}
+                <ZoomToolBoxButton
+                    controller={controller}
+                    action={currentAction}
+                />
             </View>
 
             
