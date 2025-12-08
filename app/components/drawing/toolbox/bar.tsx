@@ -105,7 +105,10 @@ export default function ToolBoxBar(props: ToolBoxBarProps) {
                             icon={tool.icon(isSelected ? '#fff' : '#9ca3af', isHorizontal)}
                             cursorType={tool.id as CursorType}
                             selected={isSelected}
-                            onPress={(type) => controller.setCursor(type)}
+                            onPress={(type) => {
+                                controller.setCursor(type);
+                                controller.setAction("draw");
+                            }}
                             isHorizontal={isHorizontal}
                         />
                     );

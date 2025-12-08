@@ -1,6 +1,8 @@
 import { CircleCursor, CursorType, DrawingCursor, EllipseCursor, LineCursor, PensilCursor, PolygonCursor, RectangleCursor } from "./cursor";
 import { Shape } from "./form";
 
+export type ToolBoxAction = 'draw' | 'zoom';
+
 type CursorChangeListener = (cursor: DrawingCursor | null) => void;
 type ShapeCreatedListener = (shape: Shape) => void;
 type ShapesChangeListener = (shapes: Shape[]) => void;
@@ -11,6 +13,8 @@ export default class ToolbarController {
     private cursor: DrawingCursor | null = null;
     private shapes: Shape[] = [];
     private preview: Shape | null = null;
+    
+    private action: ToolBoxAction = 'draw';
 
     private cursorListeners: CursorChangeListener[] = [];
     private shapeCreatedListeners: ShapeCreatedListener[] = [];
@@ -87,6 +91,14 @@ export default class ToolbarController {
     setPreview(preview: Shape | null) {
         this.preview = preview;
         this.notifyPreviewChange();
+    }
+
+    getAction(): ToolBoxAction {
+        return this.action;
+    }
+
+    setAction(action: ToolBoxAction) {
+        this.action = action;
     }
 
     onCursorChange(listener: CursorChangeListener) {
