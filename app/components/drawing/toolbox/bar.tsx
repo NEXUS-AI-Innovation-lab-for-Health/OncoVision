@@ -1,18 +1,19 @@
 import { CursorType } from "@/types/drawing/cursor";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 
+import ToolbarController from "@/types/drawing/toolbar";
 import AntDesign from '@expo/vector-icons/AntDesign';
 import Entypo from '@expo/vector-icons/Entypo';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import BucketToolBoxButton from "./bucket";
 import CursorToolBoxButton from './cursor';
+import FillToolBoxButton from "./fill";
+import ZoomToolBoxButton from "./zoom";
 
-export type ToolBoxProps = {
+export type ToolBoxBarProps = {
+    controller: ToolbarController;
     direction?: "horizontal" | "vertical";
-    selected: CursorType | null;
-    onSelect?: (type: CursorType) => void;
 }
 
 const TOOLS = [
@@ -48,17 +49,22 @@ const TOOLS = [
         icon: (color: string) => <MaterialCommunityIcons name="rectangle-outline" size={20} color={color} />,
         label: 'Rectangle'
     },
-    { 
+    /*{ 
         id: 'polygon', 
         icon: (color: string) => <MaterialCommunityIcons name="vector-polygon" size={20} color={color} />,
         label: 'Polygone'
-    }
+    }*/
 ];
 
-export default function ToolBox(props: ToolBoxProps) {
+export default function ToolBoxBar(props: ToolBoxBarProps) {
     
-    const { direction = "horizontal", selected, onSelect } = props;
+    const { controller, direction = "horizontal" } = props;
     const [displayed, setDisplayed] = useState<boolean>(true);
+    const [currentCursor, setCurrentCursor] = useState(controller.getCursor());
+
+    useEffect(() => {
+        return controller.onCursorChange(setCurrentCursor);
+    }, [controller]);
 
     const isHorizontal = direction === "horizontal";
 
@@ -92,19 +98,20 @@ export default function ToolBox(props: ToolBoxProps) {
                 isHorizontal ? styles.toolsContainerHorizontal : styles.toolsContainerVertical
             ]}>
                 {TOOLS.map((tool) => {
-                    const isSelected = selected === tool.id;
+                    const isSelected = currentCursor?.getType() === tool.id;
                     return (
                         <CursorToolBoxButton
                             key={tool.id}
                             icon={tool.icon(isSelected ? '#fff' : '#9ca3af', isHorizontal)}
                             cursorType={tool.id as CursorType}
                             selected={isSelected}
-                            onPress={(type) => onSelect?.(type)}
+                            onPress={(type) => controller.setCursor(type)}
                             isHorizontal={isHorizontal}
                         />
                     );
                 })}
-                <BucketToolBoxButton />
+                <FillToolBoxButton />
+                <ZoomToolBoxButton />
             </View>
 
             

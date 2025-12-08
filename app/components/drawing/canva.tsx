@@ -1,21 +1,23 @@
 import { useRest } from "@/hooks/rest";
 import { UseWebSocketReturn } from "@/hooks/socket";
-import { CircleCursor, CursorType, DrawingCursor, EllipseCursor, LineCursor, PensilCursor, PolygonCursor, RectangleCursor } from "@/types/drawing/cursor";
+import { DrawingCursor } from "@/types/drawing/cursor";
 import { Shape } from "@/types/drawing/form";
 import { HandshakeMessage } from "@/types/drawing/message";
+import ToolbarController from "@/types/drawing/toolbar";
 import { subscribe, WebSocketBus } from "@/utils/websocket";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { GestureResponderEvent, PanResponder, View } from "react-native";
 import Svg from 'react-native-svg';
-import ToolBox from "./toolbox/bar";
+import ToolBoxBar from "./toolbox/bar";
 
 export default function Canva() {
 
-    const [cursor, setCursor] = useState<DrawingCursor | null>(new PensilCursor());
+    const controller = useRef<ToolbarController>(new ToolbarController());
+    const [cursor, setCursor] = useState<DrawingCursor | null>(controller.current.getCursor());
     const cursorRef = useRef(cursor);
 
-    const [shapes, setShapes] = useState<Shape[]>([]);
-    const [preview, setPreview] = useState<Shape | null>(null);
+    const [shapes, setShapes] = useState<Shape[]>(controller.current.getShapes());
+    const [preview, setPreview] = useState<Shape | null>(controller.current.getPreview());
 
     const { useWebSocket } = useRest();
     const ws = useWebSocket({
@@ -31,7 +33,7 @@ export default function Canva() {
             for(const shape of message.shapes) {
                 const jsonShape = JSON.stringify(shape);
                 const parsedShape = Shape.fromJson(jsonShape);
-                setShapes(prev => [...prev, parsedShape]);
+                controller.current.addShape(parsedShape);
             }
         }
 
@@ -49,37 +51,21 @@ export default function Canva() {
         return webSocketBus.current.attach();
     }, []);
 
-    const onSelect = (newCursor: CursorType | null) => {
-        if (cursorRef.current) {
-            const finished = cursorRef.current.finish(true);
-            if (finished) {
-                setShapes(prev => [...prev, finished]);
-            }
-        }
-        switch (newCursor) {
-            case 'line':
-                setCursor(new LineCursor());
-                break;
-            case 'pensil':
-                setCursor(new PensilCursor());
-                break;
-            case 'circle':
-                setCursor(new CircleCursor());
-                break;
-            case 'ellipse':
-                setCursor(new EllipseCursor());
-                break;
-            case 'rectangle':
-                setCursor(new RectangleCursor());
-                break;
-            case 'polygon':
-                setCursor(new PolygonCursor());
-                break;
-            default:
-                setCursor(null);
-                break;
-        }
-    }
+    useEffect(() => {
+        const unsubscribeCursor = controller.current.onCursorChange(setCursor);
+        const unsubscribeShapes = controller.current.onShapesChange(setShapes);
+        const unsubscribePreview = controller.current.onPreviewChange(setPreview);
+        const unsubscribeShape = controller.current.onShapeCreated((shape) => {
+            sendShape(shape);
+        });
+
+        return () => {
+            unsubscribeCursor();
+            unsubscribeShapes();
+            unsubscribePreview();
+            unsubscribeShape();
+        };
+    }, []);
 
     useEffect(() => {
         cursorRef.current = cursor;
@@ -92,13 +78,13 @@ export default function Canva() {
             onPanResponderStart: (e: GestureResponderEvent) => {
                 const p: { x: number; y: number } = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY };
                 cursorRef.current?.press(p);
-                setPreview(cursorRef.current?.createPreview() || null);
+                controller.current.setPreview(cursorRef.current?.createPreview() || null);
             },
 
             onPanResponderMove: (e: GestureResponderEvent) => {
                 const p: { x: number; y: number } = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY };
                 cursorRef.current?.move(p);
-                setPreview(cursorRef.current?.createPreview() || null);
+                controller.current.setPreview(cursorRef.current?.createPreview() || null);
             },
 
             onPanResponderRelease: (e: GestureResponderEvent) => {
@@ -106,11 +92,11 @@ export default function Canva() {
                 cursorRef.current?.release(p);
                 const created = cursorRef.current?.finish(false);
                 if (created) {
-                    setShapes(prev => [...prev, created]);
-                    setPreview(null);
+                    controller.current.addShape(created);
+                    controller.current.setPreview(null);
                     sendShape(created);
                 } else {
-                    setPreview(cursorRef.current?.createPreview() || null);
+                    controller.current.setPreview(cursorRef.current?.createPreview() || null);
                 }
             }
         })
@@ -131,10 +117,9 @@ export default function Canva() {
                 ))}
                 {preview?.render()}
             </Svg>
-            <ToolBox
+            <ToolBoxBar
                 direction="vertical"
-                selected={cursor ? cursor.getType() : null}
-                onSelect={onSelect}
+                controller={controller.current}
             />
         </View>
     )
