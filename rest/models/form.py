@@ -28,3 +28,11 @@ class Rectangle(CamelModel, Bordered):
 
 class Polygon(CamelModel, Bordered):
     points: list[Point] = []
+    
+class Text(CamelModel): 
+    position: Point
+    content: str
+    font_size: int = 12
+    font_color: str = "yellow"
+    borderColor: str = "black"
+    borderWidth: int

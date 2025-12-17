@@ -19,6 +19,11 @@ const TOOLS = [
         icon: (color: string) => <Entypo name="pencil" size={20} color={color} />,
         label: 'Crayon'
     },
+    {
+        id: 'select',
+        icon: (color: string) => <MaterialCommunityIcons name="cursor-default" size={20} color={color} />,
+        label: 'Sélection'
+    },
     { 
         id: 'line', 
         icon: (color: string, isHorizontal?: boolean) => (
@@ -50,6 +55,16 @@ const TOOLS = [
         id: 'polygon', 
         icon: (color: string) => <MaterialCommunityIcons name="vector-polygon" size={20} color={color} />,
         label: 'Polygone'
+    },
+    { 
+        id: 'text', 
+        icon: (color: string) => <MaterialCommunityIcons name="format-text" size={20} color={color} />,
+        label: 'Texte'
+    },
+    { 
+        id: 'colorPicker', 
+        icon: (color: string) => <MaterialCommunityIcons name="format-color-fill" size={20} color={color} />,
+        label: 'Couleur'
     }
 ];
 

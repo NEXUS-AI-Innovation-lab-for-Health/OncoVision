@@ -1,6 +1,6 @@
-import { Circle, Ellipse, Line, Point, Polygon, Polyline, Rectangle, Shape } from "./form";
+import { Circle, Ellipse, Line, Point, Polygon, Polyline, Rectangle, Shape, Text } from "./form";
 
-export type CursorType = "pensil" | "line" | "circle" | "ellipse" | "rectangle" | "polygon";
+export type CursorType = "pensil" | "line" | "circle" | "ellipse" | "rectangle" | "polygon" | "text" | "colorPicker" | "select";
 
 export abstract class DrawingCursor {
 
@@ -367,4 +367,136 @@ export class PolygonCursor extends DrawingCursor {
         return null;
     }
 
+}
+
+export class TextCursor extends DrawingCursor {
+
+    private position: Point | null = null;
+    private content: string = "";
+    private textColor: string = "#000000";
+    private isPlaced: boolean = false;
+
+    constructor() {
+        super('text');
+    }
+
+    setContent(content: string): void {
+        this.content = content;
+    }
+
+    getContent(): string {
+        return this.content;
+    }
+
+    setTextColor(color: string): void {
+        this.textColor = color;
+    }
+
+    getTextColor(): string {
+        return this.textColor;
+    }
+
+    isTextPlaced(): boolean {
+        return this.isPlaced;
+    }
+
+    shouldRender(): boolean {
+        return this.position !== null;
+    }
+
+    press(point: Point): void {
+        if (this.position === null) {
+            this.position = point;
+            this.isPlaced = true;
+        }
+    }
+
+    move(point: Point): void {
+        // text doesn't change on move
+    }
+
+    createPreview(): Shape | null {
+        if (this.position) {
+            return new Text(this.position, this.content, 12, this.textColor, '#000', 1);
+        }
+        return null;
+    }
+
+    release(point: Point): void {
+        if (this.position === null) this.position = point;
+    }
+
+    finish(force?: boolean): Shape | null {
+        if (this.position) {
+            const t = new Text(this.position, this.content, 12, this.textColor, '#000', 1);
+            this.position = null;
+            this.isPlaced = false;
+            return t;
+        }
+        return null;
+    }
+
+}
+
+export class ColorPickerCursor extends DrawingCursor {
+
+    private selectedShape: Shape | null = null;
+    private newColor: string = "#000000";
+
+    constructor() {
+        super('colorPicker');
+    }
+
+    setNewColor(color: string): void {
+        this.newColor = color;
+    }
+
+    getSelectedShape(): Shape | null {
+        return this.selectedShape;
+    }
+
+    setSelectedShape(shape: Shape | null): void {
+        this.selectedShape = shape;
+    }
+
+    shouldRender(): boolean {
+        return false; // Color picker doesn't render on canvas
+    }
+
+    press(point: Point): void {
+        // Color picker doesn't draw
+    }
+
+    move(point: Point): void {
+        // Color picker doesn't draw
+    }
+
+    createPreview(): Shape | null {
+        return null;
+    }
+
+    release(point: Point): void {
+        // Color picker doesn't draw
+    }
+
+    finish(force?: boolean): Shape | null {
+        return null;
+    }
+
+}
+
+export class SelectCursor extends DrawingCursor {
+    constructor() {
+        super('select');
+    }
+
+    shouldRender(): boolean {
+        return false;
+    }
+
+    createPreview(): Shape | null {
+        return null;
+    }
+
+    // select cursor doesn't draw shapes; interactions handled at the canvas level
 }

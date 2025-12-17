@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
-import { Rect, Circle as SvgCircle, Ellipse as SvgEllipse, Line as SvgLine, Polygon as SvgPolygon, Polyline as SvgPolyline } from "react-native-svg";
+import { Rect, Circle as SvgCircle, Ellipse as SvgEllipse, Line as SvgLine, Polygon as SvgPolygon, Polyline as SvgPolyline, Text as SvgText } from "react-native-svg";
+
 
 export interface Point {
     x: number;
@@ -163,3 +164,50 @@ export class Polyline extends Shape implements Bordered {
     }
 }
 
+export class Text extends Shape implements Bordered {
+    position: Point
+    content: string
+    font_size: number = 12
+    font_color: string = "yellow"
+    borderColor: string;
+    borderWidth: number;
+
+    constructor(position: Point, content: string, font_size: number = 12, font_color: string = "yellow", borderColor: string = "black", borderWidth: number) {
+        super();
+        this.position = position;
+        this.content = content;
+        this.font_size = font_size;
+        this.font_color = font_color;
+        this.borderColor = borderColor;
+        this.borderWidth = borderWidth;
+    }
+
+    static fromJson(json: string): Text {
+        const data = JSON.parse(json);
+        return new Text(data.position, data.content, data.font_size, data.font_color, data.borderColor, data.borderWidth);
+    }
+
+    render(): ReactNode {
+        return (
+            <>
+                <Rect 
+                    x={this.position.x} 
+                    y={this.position.y} 
+                    width={100} 
+                    height={30}
+                    stroke={this.borderColor} 
+                    strokeWidth={this.borderWidth} 
+                    fill="none" 
+                />
+                <SvgText 
+                    x={this.position.x + 5} 
+                    y={this.position.y + 20} 
+                    fontSize={this.font_size}
+                    fill={this.font_color}
+                >
+                    {this.content}
+                </SvgText>
+            </>
+        );
+    }
+}
