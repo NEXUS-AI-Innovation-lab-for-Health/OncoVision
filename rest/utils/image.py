@@ -6,6 +6,8 @@ from typing import IO, Union
 import numpy as np
 import pydicom
 import io
+import openslide
+import tempfile
 
 from PIL import Image, ImageOps
 
@@ -154,3 +156,56 @@ def load_dicom(input_image: InputType) -> Image.Image:
     pixel_array = pixel_array.astype(np.uint8)
 
     return Image.fromarray(pixel_array, mode="L")
+
+def wsi_to_image(
+    input_image: str | Path | bytes | IO[bytes],
+    level: int = 0,
+    x: int = 0,
+    y: int = 0,
+    size: int = 512,
+    overview: bool = False,
+) -> Image.Image:
+
+    temp_file = None
+
+    if isinstance(input_image, (str, Path)):
+        slide = openslide.OpenSlide(str(input_image))
+
+    elif isinstance(input_image, bytes):
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wsi")
+        temp_file.write(input_image)
+        temp_file.close()
+        slide = openslide.OpenSlide(temp_file.name)
+
+    elif hasattr(input_image, "read"):
+        data = input_image.read()
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wsi")
+        temp_file.write(data)
+        temp_file.close()
+        slide = openslide.OpenSlide(temp_file.name)
+
+    else:
+        raise TypeError(f"Type d'entrée non supporté pour WSI : {type(input_image)}")
+
+    try:
+
+        if overview:
+            level = slide.level_count - 1
+            w, h = slide.level_dimensions[level]
+            img = slide.read_region((0, 0), level, (w, h))
+            return img.convert("RGB")
+
+        scale = slide.level_downsamples[level]
+        x0 = int(x * scale)
+        y0 = int(y * scale)
+
+        img = slide.read_region(
+            (x0, y0),
+            level,
+            (size, size)
+        )
+
+        return img.convert("RGB")
+
+    finally:
+        slide.close()
