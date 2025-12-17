@@ -164,6 +164,7 @@ export function RestProvider(props: RestProviderProps) {
         const fullUrl = new URL(`${url}/${endpoint}`);
         if(queryParams)
             fullUrl.search = new URLSearchParams(queryParams).toString();
+        console.log(fullUrl.toString());
 
         const response = await fetch(fullUrl.toString(), {
             method: "GET",

@@ -9,3 +9,5 @@ s3fs
 websockets
 Pillow
 PyMongo
+pydicom
+numpy

@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from io import BytesIO
 from pathlib import Path
-from typing import IO
+from typing import IO, Union
+import numpy as np
+import pydicom
+import io
 
 from PIL import Image, ImageOps
 
-def _open_image(input_image: Image.Image | str | Path | bytes | IO[bytes]) -> Image.Image:
+InputType = Union[Image.Image, str, Path, bytes, IO[bytes]]
+
+def _open_image(input_image: InputType) -> Image.Image:
     
     if isinstance(input_image, Image.Image):
         return input_image.copy()
@@ -25,7 +30,7 @@ def _open_image(input_image: Image.Image | str | Path | bytes | IO[bytes]) -> Im
 
 
 def convert_image(
-    input_image: Image.Image | str | Path | bytes | IO[bytes],
+    input_image: InputType,
     dest_format: str = "PNG",
     frame: int | None = None,
     all_frames: bool = False,
@@ -110,3 +115,42 @@ def image_to_bytes(img: Image.Image, dest_format: str = "PNG", quality: int = 95
     img.save(buf, **save_kwargs)
     buf.seek(0)
     return buf.getvalue()
+
+def load_dicom(input_image: InputType) -> Image.Image:
+    
+    if isinstance(input_image, Image.Image):
+        return input_image
+
+    if isinstance(input_image, (str, Path)):
+        ds = pydicom.dcmread(str(input_image))
+    elif isinstance(input_image, bytes):
+        ds = pydicom.dcmread(io.BytesIO(input_image))
+    elif hasattr(input_image, "read"):
+        ds = pydicom.dcmread(input_image)
+    else:
+        raise TypeError(f"Type d'entrée non supporté : {type(input_image)}")
+
+    pixel_array = ds.pixel_array.astype(np.float32)
+
+    slope = float(ds.get("RescaleSlope", 1))
+    intercept = float(ds.get("RescaleIntercept", 0))
+    pixel_array = pixel_array * slope + intercept
+
+    wc = ds.get("WindowCenter")
+    ww = ds.get("WindowWidth")
+
+    if wc is not None and ww is not None:
+        wc = float(wc[0] if isinstance(wc, pydicom.multival.MultiValue) else wc)
+        ww = float(ww[0] if isinstance(ww, pydicom.multival.MultiValue) else ww)
+
+        min_val = wc - ww / 2
+        max_val = wc + ww / 2
+        pixel_array = np.clip(pixel_array, min_val, max_val)
+
+    pixel_array -= pixel_array.min()
+    if pixel_array.max() > 0:
+        pixel_array /= pixel_array.max()
+    pixel_array *= 255
+    pixel_array = pixel_array.astype(np.uint8)
+
+    return Image.fromarray(pixel_array, mode="L")

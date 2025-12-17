@@ -47,14 +47,20 @@ class DrawingController(Controller, WebSocketHandler):
 
             await self.send_shapes(s)
 
-    async def send_shapes(self, socket: WebSocket) -> None:
+    async def send_shapes(self, socket: WebSocket, shapes: list[ShapeUnion] | None = None) -> None:
 
-        total_shapes = []
-        for a in self.canva.artists.values():
-            for shape in a.shapes:
-                if isinstance(shape, Bordered):
-                    shape.border_color = a.color
-                total_shapes.append(shape)
+        if shapes is None:
+            total_shapes = []
+            for a in self.canva.artists.values():
+                if a.connected == False:
+                    continue
+
+                for shape in a.shapes:
+                    if isinstance(shape, Bordered):
+                        shape.border_color = a.color
+                    total_shapes.append(shape)
+        else:
+            total_shapes = shapes
         handshake_message = HandshakeMessage(shapes=total_shapes)
         await socket.send_json(handshake_message.model_dump(by_alias=True))
 
@@ -79,7 +85,8 @@ class DrawingController(Controller, WebSocketHandler):
                 del self.canva.artists[socket]
             artist.connected = False
             #del self.canva.artists[socket]
-            print("Artist disconnected, but not removing from canva for now.")
+            await self.broadcast_shapes()
+        #await self.send_shapes(socket, [])
         return True
     
     async def handle_socket(self, socket: WebSocket) -> None:
