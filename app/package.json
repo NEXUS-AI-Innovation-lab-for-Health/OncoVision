@@ -10,12 +10,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@cornerstonejs/core": "^4.14.5",
+    "@cornerstonejs/dicom-image-loader": "^4.14.5",
+    "@cornerstonejs/nifti-volume-loader": "^4.14.5",
+    "@cornerstonejs/tools": "^4.14.5",
+    "@icr/polyseg-wasm": "^0.4.0",
     "@tanstack/react-query": "^5.90.12",
+    "@types/openseadragon": "^5.0.1",
     "antd": "^6.1.1",
-    "openseadragon-react-viewer": "^3.6.0",
+    "openseadragon": "^5.0.1",
     "react": "^19.2.0",
     "react-cookie": "^8.0.1",
-    "react-cornerstone-viewport": "^4.1.5",
     "react-dom": "^19.2.0",
     "react-svg": "^16.3.0"
   },
