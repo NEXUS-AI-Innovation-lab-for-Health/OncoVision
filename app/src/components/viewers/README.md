@@ -126,7 +126,28 @@ When `viewerType` is set to `'auto'` (default), the UniversalViewer automaticall
 ## Notes
 
 - **OpenSeaDragon**: All navigation controls are disabled. The viewer shows only the image.
-- **Cornerstone**: For DICOM images, you may need to register an appropriate image loader (e.g., `cornerstoneWADOImageLoader`) for full functionality.
+- **Cornerstone**: For DICOM images, you need to register an appropriate image loader before using the CornerstoneViewer component. The recommended loader is `@cornerstonejs/dicom-image-loader`. Example setup:
+  ```typescript
+  import { imageLoader } from '@cornerstonejs/core';
+  import cornerstoneWADOImageLoader from '@cornerstonejs/dicom-image-loader';
+  import dicomParser from 'dicom-parser';
+  
+  // Configure the DICOM image loader
+  cornerstoneWADOImageLoader.external.cornerstone = cornerstone;
+  cornerstoneWADOImageLoader.external.dicomParser = dicomParser;
+  cornerstoneWADOImageLoader.configure({
+    useWebWorkers: true,
+    decodeConfig: {
+      convertFloatPixelDataToInt: false,
+    },
+  });
+  
+  // Register the image loader
+  imageLoader.registerImageLoader('wadouri', cornerstoneWADOImageLoader.loadImage);
+  
+  // Use with CornerstoneViewer - url should be prefixed with 'wadouri:'
+  <CornerstoneViewer url="wadouri:path/to/file.dcm" />
+  ```
 - Both viewers initialize only once globally to optimize performance.
 
 ## Example Usage in App
