@@ -1,6 +1,6 @@
 import { CookiesProvider } from "react-cookie";
 import { RestProvider } from "./hooks/rest";
-import WSIViewer from "./components/viewers/WSIViewer";
+import WSIViewer from "./components/viewers/wsi";
 
 export default function App() {
     return (

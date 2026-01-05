@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { UniversalViewerProps } from '../../types/viewer/viewer';
-import OpenSeaDragonViewer from './OpenSeaDragonViewer';
-import CornerstoneViewer from './CornerstoneViewer';
+import OpenSeaDragonViewer from './openseadragon';
+import CornerstoneViewer from './cornerstone';
 
 export type { UniversalViewerProps };
 
