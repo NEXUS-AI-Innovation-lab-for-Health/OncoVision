@@ -10,6 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@cornerstonejs/core": "^4.15.1",
+    "@cornerstonejs/streaming-image-volume-loader": "^1.86.1",
+    "@cornerstonejs/tools": "^4.15.1",
     "@icr/polyseg-wasm": "^0.4.0",
     "@tanstack/react-query": "^5.90.12",
     "@types/openseadragon": "^5.0.1",
