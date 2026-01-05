@@ -10,12 +10,11 @@ from database.s3.connection import S3Connection, S3Credentials
 from database.mongo.connection import MongoConnection, MongoCredentials
 
 import models as _ # Load models
-import tests.test as tests
 
 # Import controllers
 from controllers.auth import AuthController
 from controllers.drawing import DrawingController
-from controllers.file import FileController
+from controllers.forward import ForwardController
 
 # Load env. variables
 dotenv.load_dotenv()
@@ -67,10 +66,6 @@ try:
     s3_connection = S3Connection(s3_credentials)
     s3_session = s3_connection.get_session()
     s3_session.ls("/")
-
-    if dev_env:
-        tests.upload_images(s3_connection)
-
 except Exception as e:
     print(f"Failed to establish S3 connection: {e}")
     exit(1)
@@ -97,7 +92,7 @@ except Exception as e:
 routers = [
     AuthController(sql_connection),
     DrawingController(),
-    FileController(s3_connection),
+    ForwardController(),
 ]
 for router in routers:
     app.include_router(router)

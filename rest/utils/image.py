@@ -7,7 +7,9 @@ import numpy as np
 import pydicom
 import io
 import openslide
+from openslide.deepzoom import DeepZoomGenerator
 import tempfile
+import os
 
 from PIL import Image, ImageOps
 
@@ -209,3 +211,79 @@ def wsi_to_image(
 
     finally:
         slide.close()
+
+
+def convert_wsi_to_dzi(
+    input_image: InputType,
+    output_dir: str | Path,
+    slide_name: str = "slide",
+    tile_size: int = 254,
+    overlap: int = 1,
+    limit_bounds: bool = False,
+    image_format: str = "jpeg",
+    quality: int = 90
+) -> None:
+    
+    output_path = Path(output_dir)
+    
+    if not output_path.exists():
+        output_path.mkdir(parents=True, exist_ok=True)
+        
+    slide = None
+    temp_file = None
+
+    try:
+        if isinstance(input_image, (str, Path)):
+            input_path = Path(input_image)
+            slide_name = input_path.stem
+            slide = openslide.OpenSlide(str(input_path))
+        
+        elif isinstance(input_image, Image.Image):
+            slide = openslide.ImageSlide(input_image)
+            
+        elif isinstance(input_image, bytes):
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wsi")
+            temp_file.write(input_image)
+            temp_file.close()
+            slide = openslide.OpenSlide(temp_file.name)
+            
+        elif hasattr(input_image, "read"):
+            data = input_image.read()
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wsi")
+            temp_file.write(data)
+            temp_file.close()
+            slide = openslide.OpenSlide(temp_file.name)
+        else:
+             raise TypeError(f"Unsupported input type: {type(input_image)}")
+    
+        dz = DeepZoomGenerator(slide, tile_size=tile_size, overlap=overlap, limit_bounds=limit_bounds)
+        
+        # Write .dzi file
+        dzi_path = output_path / f"{slide_name}.dzi"
+        with open(dzi_path, "w") as f:
+            f.write(dz.get_dzi(image_format))
+            
+        # Write tiles
+        files_dir = output_path / f"{slide_name}_files"
+        files_dir.mkdir(exist_ok=True)
+        
+        for level in range(dz.level_count):
+            level_dir = files_dir / str(level)
+            level_dir.mkdir(exist_ok=True)
+            
+            cols, rows = dz.level_tiles[level]
+            
+            for col in range(cols):
+                for row in range(rows):
+                    tile = dz.get_tile(level, (col, row))
+                    tile_path = level_dir / f"{col}_{row}.{image_format}"
+                    
+                    if image_format.lower() in ("jpeg", "jpg"):
+                        tile.save(tile_path, quality=quality)
+                    else:
+                        tile.save(tile_path)
+    finally:
+        if slide is not None:
+            slide.close()
+        if temp_file is not None and os.path.exists(temp_file.name):
+            os.remove(temp_file.name)
