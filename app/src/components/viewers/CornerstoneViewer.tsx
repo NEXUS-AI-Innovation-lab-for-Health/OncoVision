@@ -6,24 +6,15 @@ import {
 	isCornerstoneInitialized,
 	type StackViewport
 } from '@cornerstonejs/core';
-
-export type CornerstoneViewerProps = {
-	url: string;
-	width?: string | number;
-	height?: string | number;
-	className?: string;
-	onReady?: () => void;
-	onError?: (error: Error) => void;
-};
+import type { UniversalViewerProps } from '../../types/viewer/viewer';
 
 let cornerstoneInitialized = false;
 
-// Function to generate unique IDs
 function generateId(prefix: string): string {
 	return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 }
 
-export default function CornerstoneViewer(props: CornerstoneViewerProps) {
+export default function CornerstoneViewer(props: UniversalViewerProps) {
 	const { url, width = '100%', height = '100%', className, onReady, onError } = props;
 	const containerRef = useRef<HTMLDivElement>(null);
 	const renderingEngineRef = useRef<RenderingEngine | null>(null);
@@ -34,18 +25,15 @@ export default function CornerstoneViewer(props: CornerstoneViewerProps) {
 			if (!containerRef.current) return;
 
 			try {
-				// Initialize Cornerstone only once globally
 				if (!cornerstoneInitialized && !isCornerstoneInitialized()) {
 					await init();
 					cornerstoneInitialized = true;
 				}
 
-				// Create a rendering engine
 				const renderingEngineId = generateId('renderingEngine');
 				const renderingEngine = new RenderingEngine(renderingEngineId);
 				renderingEngineRef.current = renderingEngine;
 
-				// Create a viewport
 				const viewportInput = {
 					viewportId,
 					type: Enums.ViewportType.STACK,
@@ -57,17 +45,8 @@ export default function CornerstoneViewer(props: CornerstoneViewerProps) {
 
 				renderingEngine.enableElement(viewportInput);
 
-				// Get the viewport
 				const viewport = renderingEngine.getViewport(viewportId) as StackViewport;
 
-				// Load and set the image
-				// Note: For DICOM files, you should register an appropriate image loader before using this component.
-				// Example with cornerstoneWADOImageLoader:
-				//   import cornerstoneWADOImageLoader from '@cornerstonejs/dicom-image-loader';
-				//   cornerstoneWADOImageLoader.external.cornerstone = cornerstone;
-				//   cornerstoneWADOImageLoader.external.dicomParser = dicomParser;
-				//   cornerstoneWADOImageLoader.configure({ ... });
-				// The url should be in the format: 'wadouri:' + dicomFileUrl
 				const imageIds = [url];
 				await viewport.setStack(imageIds);
 				viewport.render();
@@ -85,8 +64,8 @@ export default function CornerstoneViewer(props: CornerstoneViewerProps) {
 				try {
 					renderingEngineRef.current.disableElement(viewportId);
 					renderingEngineRef.current.destroy();
-				} catch {
-					// Element might not be enabled
+				} catch (e) {
+					console.error('Error cleaning up Cornerstone viewer:', e);
 				}
 				renderingEngineRef.current = null;
 			}

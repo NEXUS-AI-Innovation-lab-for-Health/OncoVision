@@ -1,16 +1,8 @@
 import { useEffect, useRef } from 'react';
 import OpenSeadragon from 'openseadragon';
+import type { UniversalViewerProps } from '../../types/viewer/viewer';
 
-export type OpenSeaDragonViewerProps = {
-	url: string;
-	width?: string | number;
-	height?: string | number;
-	className?: string;
-	onReady?: () => void;
-	onError?: (error: Error) => void;
-};
-
-export default function OpenSeaDragonViewer(props: OpenSeaDragonViewerProps) {
+export default function OpenSeaDragonViewer(props: UniversalViewerProps) {
 	const { url, width = '100%', height = '100%', className, onReady, onError } = props;
 	const containerRef = useRef<HTMLDivElement>(null);
 	const viewerRef = useRef<OpenSeadragon.Viewer | null>(null);
@@ -19,11 +11,9 @@ export default function OpenSeaDragonViewer(props: OpenSeaDragonViewerProps) {
 		if (!containerRef.current) return;
 
 		try {
-			// Initialize OpenSeadragon viewer without UI controls
 			viewerRef.current = OpenSeadragon({
 				element: containerRef.current,
 				tileSources: url,
-				// Disable all UI controls
 				showNavigationControl: false,
 				showNavigator: false,
 				showRotationControl: false,
@@ -31,7 +21,6 @@ export default function OpenSeaDragonViewer(props: OpenSeaDragonViewerProps) {
 				showHomeControl: false,
 				showZoomControl: false,
 				showSequenceControl: false,
-				// Additional settings for clean viewer
 				prefixUrl: '',
 				gestureSettingsMouse: {
 					clickToZoom: false,

@@ -1,5 +1,5 @@
 import UniversalViewer from './UniversalViewer';
-import type { UniversalViewerProps } from '../../types/viewer';
+import type { UniversalViewerProps } from '../../types/viewer/viewer';
 
 export type WSIViewerProps = Omit<UniversalViewerProps, 'imageType'> & {
 	imageType?: 'wsi' | 'dzi' | 'iiif';
