@@ -12,3 +12,7 @@ PyMongo
 pydicom
 numpy
 openslide-python
+openslide-bin
+tifffile
+requests
+pyvips # Install vips on system
