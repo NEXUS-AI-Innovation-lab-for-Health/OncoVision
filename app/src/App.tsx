@@ -1,6 +1,6 @@
 import { CookiesProvider } from "react-cookie";
 import { RestProvider } from "./hooks/rest";
-import WSIViewer from "./components/viewers/wsi";
+import ImageUploader from "./components/file/upload";
 
 export default function App() {
     return (
@@ -9,9 +9,7 @@ export default function App() {
 				<RestProvider
 					url="http://localhost:8000"
 				>
-					<WSIViewer
-						url="http://localhost:8000/forward/wsi"
-					/>
+					<ImageUploader />
 				</RestProvider>
 			</CookiesProvider>
 		</div>

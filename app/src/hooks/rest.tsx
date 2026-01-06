@@ -141,19 +141,19 @@ export function RestProvider(props: RestProviderProps) {
         const { unbox = true, blob = false } = params;
         let json = null;
         if(!blob || (blob && !response.body)) {
-            json = await response.json();
+            json = await response.clone().json();
         }
 
         let binaryBlob: Blob | null = null;
         if(blob && response.body) {
-            binaryBlob = await response.blob();
+            binaryBlob = await response.clone().blob();
         }
 
         const result: Response<T> = {
             status: response.status,
             ok: response.ok,
             detail: json?.detail || null,
-            content: json?.content as T || null,
+            content: json?.content as T || json as T || null,
         }
 
         return unbox ? !blob ? result.content : binaryBlob : result;

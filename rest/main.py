@@ -12,9 +12,7 @@ from database.mongo.connection import MongoConnection, MongoCredentials
 import models as _ # Load models
 
 # Import controllers
-from controllers.auth import AuthController
-from controllers.drawing import DrawingController
-from controllers.forward import ForwardController
+from controllers.viewer import ViewerController
 
 # Load env. variables
 dotenv.load_dotenv()
@@ -90,9 +88,7 @@ except Exception as e:
     exit(1)
 
 routers = [
-    AuthController(sql_connection),
-    DrawingController(),
-    ForwardController(),
+    ViewerController(),
 ]
 for router in routers:
     app.include_router(router)
