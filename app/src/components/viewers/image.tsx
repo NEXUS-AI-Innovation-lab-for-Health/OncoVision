@@ -83,7 +83,7 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
         
         // Effacer le canvas
         ctx.clearRect(0, 0, cvsW, cvsH);
-        ctx.imageSmoothingEnabled = false; // Désactiver l'interpolation pour un rendu net des tuiles
+        ctx.imageSmoothingEnabled = currentState.zoom > 1; // Activer l'interpolation seulement pour le zoom au-delà de 100% pour éviter la pixellisation
 
         // Calcul du niveau DZI approprié
         const maxLevel = info.levels - 1; 
@@ -225,7 +225,7 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                 setViewState(prev => {
                     let newZoom = prev.zoom * factor;
                     if (newZoom < 0.001) newZoom = 0.001;
-                    if (newZoom > 50) newZoom = 50; 
+                    if (newZoom > 1) newZoom = 1; // Limiter le zoom au niveau maximum du serveur
                     return { ...prev, zoom: newZoom };
                 });
             } else {
@@ -241,7 +241,7 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                 setViewState(prev => {
                     let newZoom = prev.zoom * factor;
                     if (newZoom < 0.001) newZoom = 0.001;
-                    if (newZoom > 50) newZoom = 50; 
+                    if (newZoom > 1) newZoom = 1; // Limiter le zoom au niveau maximum du serveur
                     return { ...prev, zoom: newZoom };
                 });
             }
@@ -346,7 +346,7 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
             >
                 <Slider
                     min={0.01}
-                    max={5}
+                    max={1}
                     step={0.01}
                     value={viewState.zoom}
                     onChange={(value: number) => setViewState(prev => ({ ...prev, zoom: value }))}

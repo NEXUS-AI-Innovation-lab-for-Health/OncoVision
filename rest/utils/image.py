@@ -167,7 +167,7 @@ class PillowImage(MedicalImage):
 
 		crop = self.img.crop((x0, y0, x1, y1))
 		if crop.size != (tile_w, tile_h):
-			crop = crop.resize((tile_w, tile_h), resample=Image.Resampling.LANCZOS)
+			crop = crop.resize((tile_w, tile_h), resample=Image.Resampling.NEAREST)
 		if crop.mode not in {"RGB", "RGBA", "L"}:
 			crop = crop.convert("RGBA")
 		return _encode_png(crop)
@@ -215,7 +215,7 @@ class OpenSlideImage(MedicalImage):
 		region = region.convert("RGBA")
 
 		if region.size != (tile_w, tile_h):
-			region = region.resize((tile_w, tile_h), resample=Image.Resampling.LANCZOS)
+			region = region.resize((tile_w, tile_h), resample=Image.Resampling.NEAREST)
 
 		return _encode_png(region)
 
