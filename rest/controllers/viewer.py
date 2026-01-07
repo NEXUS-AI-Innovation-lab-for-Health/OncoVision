@@ -122,6 +122,7 @@ class ViewerController(Controller):
         return Response(content=dzi, media_type="application/xml")
 
     def get_tile_png(self, image_id: str, level: int, x: int, y: int):
+        
         record = self._get_record(image_id)
         img = self._open(record)
 

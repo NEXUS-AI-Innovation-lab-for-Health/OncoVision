@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { Slider } from "antd";
 import { useRest } from "../../hooks/rest";
 
 interface ImageViewerProps {
@@ -82,13 +83,13 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
         
         // Effacer le canvas
         ctx.clearRect(0, 0, cvsW, cvsH);
-        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingEnabled = false; // Désactiver l'interpolation pour un rendu net des tuiles
 
         // Calcul du niveau DZI approprié
         const maxLevel = info.levels - 1; 
         
         // On choisit le niveau le plus proche pour avoir une bonne résolution
-        let targetLevel = Math.floor(maxLevel + Math.log2(currentState.zoom));
+        let targetLevel = Math.ceil(maxLevel + Math.log2(currentState.zoom));
         if (targetLevel > maxLevel) targetLevel = maxLevel;
         if (targetLevel < 0) targetLevel = 0;
 
@@ -330,6 +331,28 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
             onMouseLeave={handleMouseUp}
             onMouseMove={handleMouseMove}
         >
+            <div 
+                style={{ 
+                    position: "absolute", 
+                    bottom: 20, 
+                    right: 20, 
+                    width: 200, 
+                    zIndex: 100,
+                    padding: "10px",
+                    background: "rgba(0,0,0,0.5)",
+                    borderRadius: "8px"
+                }}
+                onMouseDown={e => e.stopPropagation()} // Empêcher le drag du canvas quand on utilise le slider
+            >
+                <Slider
+                    min={0.01}
+                    max={5}
+                    step={0.01}
+                    value={viewState.zoom}
+                    onChange={(value: number) => setViewState(prev => ({ ...prev, zoom: value }))}
+                    tooltip={{ formatter: (value) => `Zoom: ${Math.round((value || 0) * 100)}%` }}
+                />
+            </div>
             <canvas 
                 ref={canvasRef} 
                 style={{ display: "block", width: "100%", height: "100%" }} 

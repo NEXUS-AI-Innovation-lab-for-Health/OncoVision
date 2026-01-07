@@ -54,6 +54,10 @@ def _encode_png(img: Image.Image) -> bytes:
 	img.save(buf, format="PNG", optimize=False)
 	return buf.getvalue()
 
+def _transparent_tile(tile_size: int) -> bytes:
+	img = Image.new("RGBA", (tile_size, tile_size), (0, 0, 0, 0))
+	return _encode_png(img)
+
 def load_tiff_as_pillow(path: Path) -> Image.Image:
 	arr = tifffile.imread(str(path))
 	if arr.ndim == 2:
@@ -138,15 +142,14 @@ class PillowImage(MedicalImage):
 	def tile_png(self, level: int, x: int, y: int) -> bytes:
 		info = self.info()
 		max_level = info.levels - 1
-		if level < 0 or level > max_level:
-			raise ValueError("Invalid level")
+		level = max(0, min(level, max_level))
 
 		level_w, level_h = _deepzoom_level_dims(info.width, info.height, level, max_level)
 
 		tiles_x = int(math.ceil(level_w / info.tile_size))
 		tiles_y = int(math.ceil(level_h / info.tile_size))
 		if x < 0 or x >= tiles_x or y < 0 or y >= tiles_y:
-			raise ValueError("Tile out of bounds")
+			return _transparent_tile(info.tile_size)
 
 		tile_w = min(info.tile_size, level_w - x * info.tile_size)
 		tile_h = min(info.tile_size, level_h - y * info.tile_size)
@@ -185,14 +188,13 @@ class OpenSlideImage(MedicalImage):
 	def tile_png(self, level: int, x: int, y: int) -> bytes:
 		info = self.info()
 		max_level = info.levels - 1
-		if level < 0 or level > max_level:
-			raise ValueError("Invalid level")
+		level = max(0, min(level, max_level))
 
 		level_w, level_h = _deepzoom_level_dims(info.width, info.height, level, max_level)
 		tiles_x = int(math.ceil(level_w / info.tile_size))
 		tiles_y = int(math.ceil(level_h / info.tile_size))
 		if x < 0 or x >= tiles_x or y < 0 or y >= tiles_y:
-			raise ValueError("Tile out of bounds")
+			return _transparent_tile(info.tile_size)
 
 		tile_w = min(info.tile_size, level_w - x * info.tile_size)
 		tile_h = min(info.tile_size, level_h - y * info.tile_size)
@@ -251,12 +253,11 @@ class DeepZoomImage(MedicalImage):
 	def tile_png(self, level: int, x: int, y: int) -> bytes:
 		info = self.info()
 		max_level = info.levels - 1
-		if level < 0 or level > max_level:
-			raise ValueError("Invalid level")
+		level = max(0, min(level, max_level))
 
 		tile_path = self.tiles_dir / str(level) / f"{x}_{y}.{self.format}"
 		if not tile_path.exists():
-			raise ValueError("Tile out of bounds")
+			return _transparent_tile(info.tile_size)
 
 		if self.format == "png":
 			return tile_path.read_bytes()

@@ -50,7 +50,7 @@ export default function ImageUploader() {
         <div>
             <input
                 type="file"
-                accept=".tiff,.dcm,.svs,.dzi"
+                accept=".tiff,.dcnm,.svs,.dzi"
                 onChange={handleFileChange}
                 style={{ display: 'block', marginBottom: 16 }}
             />
