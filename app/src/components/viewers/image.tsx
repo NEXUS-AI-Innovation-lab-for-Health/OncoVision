@@ -12,8 +12,8 @@ interface ViewState {
     zoom: number; // Scale factor (screen pixels per image pixel)
 }
 
-// Cache global pour les images de tuiles afin de ne pas re-télécharger pendant la session/navigation
-// Dans une implémentation plus Robuste, on gérerait la taille du cache et le nettoyage (LRU).
+// Global cache for tile images to avoid re-downloading during session/navigation
+// In a more robust implementation, we would manage cache size and cleanup (LRU).
 const tileCache = new Map<string, HTMLImageElement>();
 const activeFetches = new Set<string>();
 
@@ -23,14 +23,14 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
     const { useQuery, get } = useRest();
 
     const [viewState, setViewState] = useState<ViewState>({ x: 0, y: 0, zoom: 0.1 });
-    // Utiliser des refs pour l'état interne de draw pour éviter les dépendances changeantes
+    // Use refs for internal draw state to avoid changing dependencies
     const viewStateRef = useRef<ViewState>(viewState);
     const infoRef = useRef<any>(null);
 
     const [isDragging, setIsDragging] = useState(false);
     const lastMousePos = useRef<{ x: number, y: number } | null>(null);
 
-    // 1. Récupération des infos de l'image
+    // 1. Fetch image info
     const { data: info, refetch } = useQuery<any>({
         queryKey: ["viewer", "images", imageId, "info"],
         queryFn: async () => {
@@ -48,14 +48,14 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
         viewStateRef.current = viewState;
     }, [viewState]);
 
-    // Initialiser la vue au centre quand les infos arrivent
+    // Initialize view to center when info arrives
     useEffect(() => {
         console.log("Image info loaded:", info);
         if (info && containerRef.current) {
             const containerW = containerRef.current.clientWidth;
             const containerH = containerRef.current.clientHeight;
             
-            // Zoom initial pour voir toute l'image (contain) sans marge excessive
+            // Initial zoom to see the entire image (contain) without excessive margin
             const scaleX = containerW / info.width;
             const scaleY = containerH / info.height;
             const initialZoom = Math.min(scaleX, scaleY);
@@ -70,7 +70,7 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
         }
     }, [info]);
 
-    // Fonction de dessin principale stable
+    // Main stable drawing function
     const draw = useCallback(() => {
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext("2d");
@@ -81,28 +81,28 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
 
         const { width: cvsW, height: cvsH } = canvas;
         
-        // Effacer le canvas
+        // Clear the canvas
         ctx.clearRect(0, 0, cvsW, cvsH);
-        ctx.imageSmoothingEnabled = currentState.zoom > 1; // Activer l'interpolation seulement pour le zoom au-delà de 100% pour éviter la pixellisation
+        ctx.imageSmoothingEnabled = currentState.zoom > 1; // Enable interpolation only for zoom beyond 100% to avoid pixelation
 
-        // Calcul du niveau DZI approprié
+        // Calculate appropriate DZI level
         const maxLevel = info.levels - 1; 
         
-        // On choisit le niveau le plus proche pour avoir une bonne résolution
+        // Choose the closest level for good resolution
         let targetLevel = Math.ceil(maxLevel + Math.log2(currentState.zoom));
         if (targetLevel > maxLevel) targetLevel = maxLevel;
         if (targetLevel < 0) targetLevel = 0;
 
-        // Facteur d'échelle entre le niveau DZI choisi et l'image originale
+        // Scale factor between chosen DZI level and original image
         const levelScaleFactor = Math.pow(0.5, maxLevel - targetLevel);
         
-        // Dimensions logiques de l'image à ce niveau
+        // Logical dimensions of the image at this level
         const levelWidth = Math.ceil(info.width * levelScaleFactor);
         const levelHeight = Math.ceil(info.height * levelScaleFactor);
         
         const tileSize = info.tileSize;
 
-        // Calculer la zone visible en coordonnées IMAGE (full resolution)
+        // Calculate visible area in IMAGE coordinates (full resolution)
         const visibleW = cvsW / currentState.zoom;
         const visibleH = cvsH / currentState.zoom;
         const visibleLeft = currentState.x - visibleW / 2;
@@ -110,19 +110,19 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
         const visibleRight = visibleLeft + visibleW;
         const visibleBottom = visibleTop + visibleH;
 
-        // Convertir cette zone visible en coordonnées du NIVEAU actuel
+        // Convert this visible area to current LEVEL coordinates
         const levelVisibleLeft = visibleLeft * levelScaleFactor;
         const levelVisibleTop = visibleTop * levelScaleFactor;
         const levelVisibleRight = visibleRight * levelScaleFactor;
         const levelVisibleBottom = visibleBottom * levelScaleFactor;
 
-        // Identifier les indices de tuiles
+        // Identify tile indices
         const minTileX = Math.floor(levelVisibleLeft / tileSize);
         const maxTileX = Math.floor(levelVisibleRight / tileSize);
         const minTileY = Math.floor(levelVisibleTop / tileSize);
         const maxTileY = Math.floor(levelVisibleBottom / tileSize);
 
-        // Nombre max de tiles à ce niveau
+        // Max number of tiles at this level
         const maxTilesX = Math.ceil(levelWidth / tileSize);
         const maxTilesY = Math.ceil(levelHeight / tileSize);
 
@@ -133,36 +133,36 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                 const cacheKey = `${imageId}-${targetLevel}-${tx}-${ty}`;
                 const cachedImg = tileCache.get(cacheKey);
 
-                // Position écran de la tuile
-                // Coord tuile dans le niveau
+                // Screen position of the tile
+                // Tile coords in the level
                 const tileImgX = tx * tileSize;
                 const tileImgY = ty * tileSize;
 
-                // Coord image full
+                // Full image coords
                 const fullImgX = tileImgX / levelScaleFactor;
                 const fullImgY = tileImgY / levelScaleFactor;
 
-                // Position écran
+                // Screen position
                 const screenX = (fullImgX - currentState.x) * currentState.zoom + cvsW / 2;
                 const screenY = (fullImgY - currentState.y) * currentState.zoom + cvsH / 2;
 
-                // Taille écran
+                // Screen size
                 const tileW = (tx === maxTilesX - 1) ? (levelWidth - tx * tileSize) : tileSize;
                 const tileH = (ty === maxTilesY - 1) ? (levelHeight - ty * tileSize) : tileSize;
 
                 const drawW = (tileW / levelScaleFactor) * currentState.zoom;
                 const drawH = (tileH / levelScaleFactor) * currentState.zoom;
                 
-                // Petit overlap pour éviter les lignes blanches
+                // Small overlap to avoid white lines
                 const overlap = 0.5;
 
                 if (cachedImg) {
                     ctx.drawImage(cachedImg, 0, 0, tileW, tileH, screenX - overlap, screenY - overlap, drawW + 2*overlap, drawH + 2*overlap);
                 } else {
-                    // Lancer le chargement si pas déjà en cours
+                    // Start loading if not already in progress
                     if (!activeFetches.has(cacheKey)) {
                         activeFetches.add(cacheKey);
-                        // Appel API pour récupérer le Blob
+                        // API call to fetch the Blob
                         get({ 
                             endpoint: `viewer/images/${imageId}/tile/${targetLevel}/${tx}_${ty}.png`,
                             blob: true 
@@ -201,11 +201,11 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
         ctx.fillText(`Lvl: ${targetLevel} | Zoom: ${currentState.zoom.toFixed(4)} | Center: ${currentState.x.toFixed(0)}, ${currentState.y.toFixed(0)}`, 10, 20);
         ctx.shadowBlur = 0;
 
-    }, [imageId, get]); // draw est stable et n'a plus de dépendances changeantes
+    }, [imageId, get]); // draw is stable and no longer has changing dependencies
 
 
-    // Gestion des événements souris pour Pan & Zoom via Ref pour accès aux handlers stables
-    // On utilise un useEffect global pour le wheel non-passif
+    // Mouse event handling for Pan & Zoom using Ref for stable handler access
+    // Use a global useEffect for non-passive wheel
     useEffect(() => {
         const element = containerRef.current;
         if(!element) return;
@@ -213,11 +213,11 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
         const onWheel = (e: WheelEvent) => {
             e.preventDefault();
             
-            // Sur trackpad, le pinch-to-zoom envoie souvent ctrlKey=true avec wheel
-            // Ou alors c'est un simple scroll (pan).
+            // On trackpad, pinch-to-zoom often sends ctrlKey=true with wheel
+            // Or it's a simple scroll (pan).
             
             if (e.ctrlKey) {
-                // Pinch-to-zoom simulé par wheel
+                // Pinch-to-zoom simulated by wheel
                 const zoomSensitivity = 0.01;
                 const delta = -e.deltaY * zoomSensitivity;
                 const factor = Math.pow(2, delta);
@@ -225,14 +225,14 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                 setViewState(prev => {
                     let newZoom = prev.zoom * factor;
                     if (newZoom < 0.001) newZoom = 0.001;
-                    if (newZoom > 1) newZoom = 1; // Limiter le zoom au niveau maximum du serveur
+                    if (newZoom > 1) newZoom = 1; // Limit zoom to server's maximum level
                     return { ...prev, zoom: newZoom };
                 });
             } else {
-                // Scroll simple -> on peut l'utiliser pour le zoom ou le pan? 
-                // Classiquement scroll = zoom dans les viewers, 
-                // mais sur trackpad c'est souvent Pan.
-                // Ici on garde scroll = zoom comme demandé, mais on ajoute la gestion 'ctrl' pour le pinch spécifique.
+                // Simple scroll -> can we use it for zoom or pan? 
+                // Traditionally scroll = zoom in viewers, 
+                // but on trackpad it's often pan.
+                // Here we keep scroll = zoom as requested, but add 'ctrl' handling for specific pinch.
                 
                 const zoomSensitivity = 0.001;
                 const delta = -e.deltaY * zoomSensitivity;
@@ -241,13 +241,13 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                 setViewState(prev => {
                     let newZoom = prev.zoom * factor;
                     if (newZoom < 0.001) newZoom = 0.001;
-                    if (newZoom > 1) newZoom = 1; // Limiter le zoom au niveau maximum du serveur
+                    if (newZoom > 1) newZoom = 1; // Limit zoom to server's maximum level
                     return { ...prev, zoom: newZoom };
                 });
             }
         };
         
-        // Empêcher le zoom natif Safari (Pinch)
+        // Prevent native Safari zoom (Pinch)
         const PreventDefault = (e: Event) => e.preventDefault();
 
         element.addEventListener('wheel', onWheel, { passive: false });
@@ -286,20 +286,17 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
         }));
     };
 
-    // Redessiner quand l'état change
+    // Redraw when state changes
     useEffect(() => {
         requestAnimationFrame(draw);
     }, [draw, viewState]);
 
-    // Redessiner quand l'image change
+    // Redraw when image changes
     useEffect(() => {
-        // Reset cache? 
-        // tileCache.clear(); // Peut-être trop agressif si on revient sur l'image
-        // Mais nécessaire si l'ID reste le même mais le contenu change (peu probable ici avec UUID)
         refetch();
     }, [imageId, refetch]);
 
-    // Resize observer pour ajuster la taille du canvas
+    // Resize observer to adjust canvas size
     useEffect(() => {
         if (!containerRef.current || !canvasRef.current) return;
         const resizeObserver = new ResizeObserver(() => {
@@ -342,7 +339,7 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                     background: "rgba(0,0,0,0.5)",
                     borderRadius: "8px"
                 }}
-                onMouseDown={e => e.stopPropagation()} // Empêcher le drag du canvas quand on utilise le slider
+                onMouseDown={e => e.stopPropagation()} // Prevent canvas drag when using the slider
             >
                 <Slider
                     min={0.01}
