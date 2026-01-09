@@ -88,7 +88,7 @@ except Exception as e:
     exit(1)
 
 routers = [
-    ViewerController(),
+    ViewerController(s3_connection),
 ]
 for router in routers:
     app.include_router(router)
