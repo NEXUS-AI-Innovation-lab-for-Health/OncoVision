@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Slider, Button } from "antd";
-import { PlusOutlined, MinusOutlined, CompressOutlined } from "@ant-design/icons";
+import { Slider, Button, Switch } from "antd";
+import { PlusOutlined, MinusOutlined, CompressOutlined, EditOutlined } from "@ant-design/icons";
 import { useRest } from "../../hooks/rest";
 import ImagePreview from "./preview"; // New import
+import DrawingCanvas from "../drawing/DrawingCanvas";
 
 interface ImageViewerProps {
     imageId: string;
@@ -31,6 +32,7 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
 
     const [isDragging, setIsDragging] = useState(false);
     const lastMousePos = useRef<{ x: number, y: number } | null>(null);
+    const [drawingMode, setDrawingMode] = useState(false);
 
     // 1. Fetch image info
     const { data: info, refetch } = useQuery<any>({
@@ -266,11 +268,13 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
     }, []); // Empty deps = bind once
 
     const handleMouseDown = (e: React.MouseEvent) => {
+        if (drawingMode) return; // Don't pan when drawing
         setIsDragging(true);
         lastMousePos.current = { x: e.clientX, y: e.clientY };
     };
 
     const handleMouseUp = () => {
+        if (drawingMode) return;
         setIsDragging(false);
         lastMousePos.current = null;
         checkBounds();
@@ -318,6 +322,7 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
+        if (drawingMode) return; // Don't pan when drawing
         if (!isDragging || !lastMousePos.current) return;
         const dx = e.clientX - lastMousePos.current.x;
         const dy = e.clientY - lastMousePos.current.y;
@@ -383,7 +388,7 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                 backgroundColor: "#111", 
                 position: "relative", 
                 overflow: "hidden", 
-                cursor: "move" 
+                cursor: drawingMode ? "crosshair" : "move"
             }}
             onMouseDown={handleMouseDown}
             onMouseUp={handleMouseUp}
@@ -406,6 +411,26 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                 boxShadow: '0 2px 8px rgba(0,0,0,0.5)'
             }} 
             onMouseDown={e => e.stopPropagation()}>
+                {/* Drawing mode toggle */}
+                <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 8,
+                    paddingBottom: 8,
+                    marginBottom: 8,
+                    borderBottom: '1px solid rgba(255,255,255,0.1)'
+                }}>
+                    <Switch 
+                        checked={drawingMode}
+                        onChange={setDrawingMode}
+                        size="small"
+                    />
+                    <span style={{ color: '#eee', fontSize: 12 }}>
+                        <EditOutlined style={{ marginRight: 4 }} />
+                        Dessin
+                    </span>
+                </div>
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
                     <Button type="text" icon={<PlusOutlined style={{ color: '#eee' }} />} size="small" onClick={() => zoomBy(1.25)} />
                     <div style={{ height: 100, padding: '8px 0' }}>
@@ -441,6 +466,15 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                 ref={canvasRef} 
                 style={{ display: "block", width: "100%", height: "100%" }} 
             />
+
+            {/* Drawing layer overlay */}
+            {drawingMode && containerRef.current && (
+                <DrawingCanvas
+                    width={containerRef.current.clientWidth}
+                    height={containerRef.current.clientHeight}
+                    viewState={viewState}
+                />
+            )}
         </div>
     );
 }
