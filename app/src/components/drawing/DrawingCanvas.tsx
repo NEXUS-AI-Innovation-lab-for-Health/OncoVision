@@ -13,7 +13,6 @@ interface DrawingCanvasProps {
     width: number;
     height: number;
     viewState: { x: number; y: number; zoom: number };
-    containerRef?: React.RefObject<HTMLDivElement>;
 }
 
 interface DrawingPoint {
@@ -277,7 +276,7 @@ export default function DrawingCanvas({
                     top: 0,
                     left: 0,
                     pointerEvents: 'auto',
-                    cursor: tool === 'pen' ? 'crosshair' : 'pointer',
+                    cursor: 'crosshair',
                     zIndex: 200
                 }}
                 onMouseDown={handleMouseDown}
