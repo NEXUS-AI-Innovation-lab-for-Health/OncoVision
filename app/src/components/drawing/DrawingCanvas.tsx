@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type DrawingTool = 'pen' | 'eraser';
 
@@ -84,7 +84,7 @@ export default function DrawingCanvas({
         strokesRef.current = strokes;
     }, [strokes]);
 
-    const imageToScreen = useCallback((imgX: number, imgY: number) => {
+    const imageToScreen = (imgX: number, imgY: number) => {
         const vs = viewStateRef.current;
         const containerW = width;
         const containerH = height;
@@ -94,9 +94,9 @@ export default function DrawingCanvas({
         const screenY = (imgY - vs.y) * vs.zoom + containerH / 2;
         
         return { x: screenX, y: screenY };
-    }, [width, height]);
+    };
 
-    const redrawCanvas = useCallback(() => {
+    const redrawCanvas = () => {
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext('2d');
         if (!canvas || !ctx) return;
@@ -134,12 +134,12 @@ export default function DrawingCanvas({
 
         // Reset composite operation
         ctx.globalCompositeOperation = 'source-over';
-    }, [width, height, imageToScreen]);
+    };
 
     // Redraw all strokes when canvas size changes or view changes
     useEffect(() => {
         redrawCanvas();
-    }, [strokes, viewState, redrawCanvas]);
+    }, [strokes, viewState, width, height]);
 
     const screenToImage = (screenX: number, screenY: number) => {
         const vs = viewStateRef.current;
