@@ -46,7 +46,6 @@ export default function DrawingCanvas({
     const [strokes, setStrokes] = useState<DrawingStroke[]>(externalStrokes || []);
     const [currentStroke, setCurrentStroke] = useState<DrawingPoint[]>([]);
     
-    const viewStateRef = useRef(viewState);
     const strokesRef = useRef(strokes);
 
     // Sync with external props
@@ -77,26 +76,27 @@ export default function DrawingCanvas({
     }, [strokes, onStrokesChange]);
 
     useEffect(() => {
-        viewStateRef.current = viewState;
-    }, [viewState]);
-
-    useEffect(() => {
         strokesRef.current = strokes;
     }, [strokes]);
 
+    // Helper function to convert image coordinates to screen coordinates
     const imageToScreen = (imgX: number, imgY: number) => {
-        const vs = viewStateRef.current;
-        const containerW = width;
-        const containerH = height;
-        
-        // Convert image coordinates to screen coordinates
-        const screenX = (imgX - vs.x) * vs.zoom + containerW / 2;
-        const screenY = (imgY - vs.y) * vs.zoom + containerH / 2;
-        
+        const screenX = (imgX - viewState.x) * viewState.zoom + width / 2;
+        const screenY = (imgY - viewState.y) * viewState.zoom + height / 2;
         return { x: screenX, y: screenY };
     };
 
-    const redrawCanvas = () => {
+    // Helper function to convert screen coordinates to image coordinates
+    const screenToImage = (screenX: number, screenY: number) => {
+        const relX = screenX - width / 2;
+        const relY = screenY - height / 2;
+        const imgX = viewState.x + relX / viewState.zoom;
+        const imgY = viewState.y + relY / viewState.zoom;
+        return { x: imgX, y: imgY };
+    };
+
+    // Redraw all strokes when canvas size changes or view changes
+    useEffect(() => {
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext('2d');
         if (!canvas || !ctx) return;
@@ -104,7 +104,7 @@ export default function DrawingCanvas({
         // Clear canvas
         ctx.clearRect(0, 0, width, height);
 
-        // Draw all strokes
+        // Draw all strokes using current viewState
         strokesRef.current.forEach(stroke => {
             if (stroke.points.length < 2) return;
 
@@ -121,41 +121,23 @@ export default function DrawingCanvas({
 
             ctx.beginPath();
             const firstPoint = stroke.points[0];
-            const screenPos = imageToScreen(firstPoint.x, firstPoint.y);
-            ctx.moveTo(screenPos.x, screenPos.y);
+            // Use viewState directly from current render
+            const screenX1 = (firstPoint.x - viewState.x) * viewState.zoom + width / 2;
+            const screenY1 = (firstPoint.y - viewState.y) * viewState.zoom + height / 2;
+            ctx.moveTo(screenX1, screenY1);
 
             for (let i = 1; i < stroke.points.length; i++) {
                 const point = stroke.points[i];
-                const pos = imageToScreen(point.x, point.y);
-                ctx.lineTo(pos.x, pos.y);
+                const screenX = (point.x - viewState.x) * viewState.zoom + width / 2;
+                const screenY = (point.y - viewState.y) * viewState.zoom + height / 2;
+                ctx.lineTo(screenX, screenY);
             }
             ctx.stroke();
         });
 
         // Reset composite operation
         ctx.globalCompositeOperation = 'source-over';
-    };
-
-    // Redraw all strokes when canvas size changes or view changes
-    useEffect(() => {
-        redrawCanvas();
     }, [strokes, viewState, width, height]);
-
-    const screenToImage = (screenX: number, screenY: number) => {
-        const vs = viewStateRef.current;
-        const containerW = width;
-        const containerH = height;
-        
-        // Screen coordinates relative to canvas center
-        const relX = screenX - containerW / 2;
-        const relY = screenY - containerH / 2;
-        
-        // Convert to image coordinates
-        const imgX = vs.x + relX / vs.zoom;
-        const imgY = vs.y + relY / vs.zoom;
-        
-        return { x: imgX, y: imgY };
-    };
 
     const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
         setIsDrawing(true);
