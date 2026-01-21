@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import IO, Union, Literal
 import numpy as np
 import pydicom
+from pydicom.uid import ImplicitVRLittleEndian
 import openslide
 import tifffile
 import math
@@ -26,7 +27,7 @@ def detect_format_from_path(path: Path) -> ImageFormat | None:
 	suffix = path.suffix.lower()
 	if suffix in {".dcm"}:
 		return "DICOM"
-	if suffix in {".svs"}:
+	if suffix in {".svs", ".dsv"}:
 		return "SVS"
 	if suffix in {".dzi"}:
 		return "DEEPZOOM"
@@ -50,8 +51,32 @@ def _clamp_int(value: int, low: int, high: int) -> int:
 	return max(low, min(high, value))
 
 def _encode_png(img: Image.Image) -> bytes:
+	# NOTE: malgré son nom historique, on l'utilise comme encodeur "tuile".
+	# Dans ce projet on sert du WebP (lossless par défaut).
+	return _encode_webp(img, lossless=True)
+
+def _encode_webp(img: Image.Image, lossless: bool = True) -> bytes:
+	# WebP lossless: la qualité est identique; on joue surtout sur le temps/ratio.
+	# method=0 => encode beaucoup plus rapide (fichiers parfois plus gros), sans perte.
+	# thread_level=1 => active le multithread si supporté par Pillow/libwebp.
+	if img.mode not in {"RGB", "RGBA", "L"}:
+		img = img.convert("RGBA")
+
 	buf = BytesIO()
-	img.save(buf, format="PNG", optimize=False)
+	save_kwargs = {
+		"format": "WEBP",
+		"lossless": lossless,
+		"quality": 100,
+		"method": 0,
+	}
+	try:
+		img.save(buf, **save_kwargs, thread_level=1)
+	except TypeError:
+		# Compat: certaines versions Pillow n'exposent pas thread_level ou method.
+		try:
+			img.save(buf, **save_kwargs)
+		except TypeError:
+			img.save(buf, format="WEBP", lossless=lossless, quality=100)
 	return buf.getvalue()
 
 def _transparent_tile(tile_size: int) -> bytes:
@@ -75,6 +100,18 @@ def load_tiff_as_pillow(path: Path) -> Image.Image:
 
 def load_dicom_as_pillow(path: Path) -> Image.Image:
 	ds = pydicom.dcmread(str(path), force=True)
+	# Fallback: certains fichiers n'ont pas de Transfer Syntax UID.
+	if not getattr(ds, "file_meta", None):
+		ds.file_meta = pydicom.dataset.FileMetaDataset()
+	if not getattr(ds.file_meta, "TransferSyntaxUID", None):
+		ds.file_meta.TransferSyntaxUID = ImplicitVRLittleEndian
+	# Vérifie la présence des données pixel
+	if not (
+		hasattr(ds, "PixelData")
+		or hasattr(ds, "FloatPixelData")
+		or hasattr(ds, "DoubleFloatPixelData")
+	):
+		raise ValueError("DICOM sans pixel data")
 
 	try:
 		from pydicom.pixel_data_handlers.util import apply_voi_lut

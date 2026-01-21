@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from uuid import uuid4
+import time
 
 from fastapi import UploadFile, File, Form, HTTPException
 from fastapi.responses import Response
@@ -27,12 +28,12 @@ class ViewerController(Controller):
         self.add_api_route("/images/{image_id}/info", self.get_info, methods=["GET"])
         self.add_api_route("/images/{image_id}.dzi", self.get_dzi, methods=["GET"])
         self.add_api_route(
-            "/images/{image_id}/level/{level}.png",
+            "/images/{image_id}/level/{level}.webp",
             self.get_level_png,
             methods=["GET"],
         )
         self.add_api_route(
-            "/images/{image_id}/tile/{level}/{tx}_{ty}.png",
+            "/images/{image_id}/tile/{level}/{tx}_{ty}.webp",
             self.get_tile_png,
             methods=["GET"],
         )
@@ -57,7 +58,11 @@ class ViewerController(Controller):
 
         try:
             # Register and upload levels to S3
-            record = self.registry.register_and_upload_levels(kind, temp_path)
+            print(f"Uploading image {filename} as kind {kind}...")
+            started = time.perf_counter()
+            record = self.registry.register_and_upload_levels(kind, temp_path, debug=True)
+            elapsed = time.perf_counter() - started
+            print(f"Image {filename} uploaded with id {record.id} in {elapsed:.2f}s")
 
             # For info, we need to get dimensions - we'll need to modify registry to store this
             # For now, return basic info
@@ -67,8 +72,10 @@ class ViewerController(Controller):
                 "levels": record.levels,
                 "dzi": f"/viewer/images/{record.id}.dzi",
                 "info": f"/viewer/images/{record.id}/info",
-                "levelUrlTemplate": f"/viewer/images/{record.id}/level/{{level}}.png",
+                "levelUrlTemplate": f"/viewer/images/{record.id}/level/{{level}}.webp",
             }
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         finally:
             # Clean up temp file
             temp_path.unlink(missing_ok=True)
@@ -90,7 +97,7 @@ class ViewerController(Controller):
         dzi = (
             f"<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
             f"<Image xmlns=\"http://schemas.microsoft.com/deepzoom/2008\" "
-            f"Format=\"png\" Overlap=\"0\" TileSize=\"256\">"  # Assuming tile size 256 for DZI compatibility
+            f"Format=\"webp\" Overlap=\"0\" TileSize=\"256\">"  # Assuming tile size 256 for DZI compatibility
             f"<Size Width=\"{record.width}\" Height=\"{record.height}\"/>"
             f"</Image>"
         )
@@ -106,7 +113,7 @@ class ViewerController(Controller):
         except Exception as e:
             raise HTTPException(status_code=404, detail=str(e))
 
-        return Response(content=png_bytes, media_type="image/png")
+        return Response(content=png_bytes, media_type="image/webp")
 
     def get_tile_png(self, image_id: str, level: int, tx: int, ty: int):
         record = self._get_record(image_id)
@@ -118,7 +125,7 @@ class ViewerController(Controller):
         except Exception as e:
             raise HTTPException(status_code=404, detail=str(e))
 
-        return Response(content=png_bytes, media_type="image/png")
+        return Response(content=png_bytes, media_type="image/webp")
 
     def _get_record(self, image_id: str) -> ImageRecord:
         try:

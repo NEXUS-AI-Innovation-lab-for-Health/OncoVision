@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Slider } from "antd";
+import { Slider, Button } from "antd";
+import { PlusOutlined, MinusOutlined, CompressOutlined } from "@ant-design/icons";
 import { useRest } from "../../hooks/rest";
+import ImagePreview from "./preview"; // New import
 
 interface ImageViewerProps {
     imageId: string;
@@ -164,7 +166,7 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                         activeFetches.add(cacheKey);
                         // API call to fetch the Blob
                         get({ 
-                            endpoint: `viewer/images/${imageId}/tile/${targetLevel}/${tx}_${ty}.png`,
+                            endpoint: `viewer/images/${imageId}/tile/${targetLevel}/${tx}_${ty}.webp`,
                             blob: true 
                         }).then((blob) => {
                             if (blob instanceof Blob) {
@@ -193,13 +195,13 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
             }
         }
         
-        // Debug info
-        ctx.fillStyle = "white";
-        ctx.font = "14px monospace";
-        ctx.shadowColor = "black";
-        ctx.shadowBlur = 4;
-        ctx.fillText(`Lvl: ${targetLevel} | Zoom: ${currentState.zoom.toFixed(4)} | Center: ${currentState.x.toFixed(0)}, ${currentState.y.toFixed(0)}`, 10, 20);
-        ctx.shadowBlur = 0;
+        // Debug info (Removed to screen space is clean)
+        // ctx.fillStyle = "white";
+        // ctx.font = "14px monospace";
+        // ctx.shadowColor = "black";
+        // ctx.shadowBlur = 4;
+        // ctx.fillText(`Lvl: ${targetLevel} | Zoom: ${currentState.zoom.toFixed(4)} | Center: ${currentState.x.toFixed(0)}, ${currentState.y.toFixed(0)}`, 10, 20);
+        // ctx.shadowBlur = 0;
 
     }, [imageId, get]); // draw is stable and no longer has changing dependencies
 
@@ -271,6 +273,48 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
     const handleMouseUp = () => {
         setIsDragging(false);
         lastMousePos.current = null;
+        checkBounds();
+    };
+
+    const checkBounds = () => {
+        if(!info) return;
+        const state = viewStateRef.current;
+        // Clamp center to [0, width] and [0, height]
+        // This ensures at least one quadrant is visible. 
+        // We can be stricter if we want to ensure margin.
+        
+        // Let's ensure the center is strictly inside the image bounds.
+        // It's a simple, robust rule.
+        const clampedX = Math.max(0, Math.min(info.width, state.x));
+        const clampedY = Math.max(0, Math.min(info.height, state.y));
+
+        if (clampedX !== state.x || clampedY !== state.y) {
+            animateTo({ x: clampedX, y: clampedY, zoom: state.zoom });
+        }
+    };
+
+    const animateTo = (target: ViewState) => {
+        const start = viewStateRef.current;
+        const startTime = performance.now();
+        const duration = 300; // ms
+
+        const animate = (time: number) => {
+            const elapsed = time - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            // Ease out cubic
+            const ease = 1 - Math.pow(1 - progress, 3);
+
+            const newX = start.x + (target.x - start.x) * ease;
+            const newY = start.y + (target.y - start.y) * ease;
+            const newZoom = start.zoom + (target.zoom - start.zoom) * ease;
+
+            setViewState({ x: newX, y: newY, zoom: newZoom });
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            }
+        };
+        requestAnimationFrame(animate);
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
@@ -284,6 +328,24 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
             x: prev.x - dx / prev.zoom,
             y: prev.y - dy / prev.zoom,
         }));
+    };
+
+    // Convenient zoom helpers
+    const zoomBy = (factor: number) => setViewState(prev => {
+        let newZoom = prev.zoom * factor;
+        newZoom = Math.max(0.001, Math.min(1, newZoom));
+        return { ...prev, zoom: newZoom };
+    });
+
+    const fitToScreen = () => {
+        if (!info || !containerRef.current) return;
+        const containerW = containerRef.current.clientWidth;
+        const containerH = containerRef.current.clientHeight;
+        const scaleX = containerW / info.width;
+        const scaleY = containerH / info.height;
+        const initialZoom = Math.min(scaleX, scaleY);
+        // Animate instead of hard set for better feel
+        animateTo({ x: info.width / 2, y: info.height / 2, zoom: initialZoom });
     };
 
     // Redraw when state changes
@@ -328,28 +390,53 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
             onMouseLeave={handleMouseUp}
             onMouseMove={handleMouseMove}
         >
-            <div 
-                style={{ 
-                    position: "absolute", 
-                    bottom: 20, 
-                    right: 20, 
-                    width: 200, 
-                    zIndex: 100,
-                    padding: "10px",
-                    background: "rgba(0,0,0,0.5)",
-                    borderRadius: "8px"
-                }}
-                onMouseDown={e => e.stopPropagation()} // Prevent canvas drag when using the slider
-            >
-                <Slider
-                    min={0.01}
-                    max={1}
-                    step={0.01}
-                    value={viewState.zoom}
-                    onChange={(value: number) => setViewState(prev => ({ ...prev, zoom: value }))}
-                    tooltip={{ formatter: (value) => `Zoom: ${Math.round((value || 0) * 100)}%` }}
+            <div style={{ 
+                position: "absolute", 
+                left: 16, 
+                top: 16, 
+                zIndex: 300, 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: 6, 
+                padding: '8px 4px', 
+                background: 'rgba(30,30,30,0.85)', 
+                borderRadius: 6,
+                backdropFilter: 'blur(4px)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.5)'
+            }} 
+            onMouseDown={e => e.stopPropagation()}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                    <Button type="text" icon={<PlusOutlined style={{ color: '#eee' }} />} size="small" onClick={() => zoomBy(1.25)} />
+                    <div style={{ height: 100, padding: '8px 0' }}>
+                        <Slider
+                            vertical
+                            min={0.01}
+                            max={1}
+                            step={0.01}
+                            value={viewState.zoom}
+                            onChange={(value: number) => setViewState(prev => ({ ...prev, zoom: value }))}
+                            tooltip={{ formatter: (value: number | undefined) => `Zoom: ${Math.round((value || 0) * 100)}%`, placement: 'right' }}
+                        />
+                    </div>
+                    <Button type="text" icon={<MinusOutlined style={{ color: '#eee' }} />} size="small" onClick={() => zoomBy(1 / 1.25)} />
+                    <Button type="text" icon={<CompressOutlined style={{ color: '#eee' }} />} size="small" onClick={fitToScreen} title="Fit to screen" />
+                </div>
+            </div>
+
+            {/* Thumbnail preview */}
+            <div style={{ position: 'absolute', right: 16, top: 16, zIndex: 300 }}>
+                <ImagePreview
+                    info={info}
+                    imageId={imageId}
+                    viewState={viewState}
+                    setViewState={setViewState}
+                    get={get}
+                    containerW={containerRef.current?.clientWidth || 0}
+                    containerH={containerRef.current?.clientHeight || 0}
                 />
             </div>
+
             <canvas 
                 ref={canvasRef} 
                 style={{ display: "block", width: "100%", height: "100%" }} 
