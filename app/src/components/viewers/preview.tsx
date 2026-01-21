@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { DrawingStroke } from "../drawing/DrawingCanvas";
 
 interface PreviewProps {
     info: any;
@@ -9,6 +10,7 @@ interface PreviewProps {
     containerW?: number;
     containerH?: number;
     thumbWidth?: number;
+    strokes?: DrawingStroke[];
 }
 
 const tileCache = new Map<string, HTMLImageElement>();
@@ -21,7 +23,8 @@ export default function ImagePreview({
     get, 
     containerW = 800, 
     containerH = 600,
-    thumbWidth = 150 
+    thumbWidth = 150,
+    strokes = []
 }: PreviewProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [previewSrc, setPreviewSrc] = useState<string | null>(null);
@@ -96,6 +99,39 @@ export default function ImagePreview({
             ctx.fillRect(0, 0, cw, ch);
         }
 
+        // Scale factor from image coordinates to thumbnail
+        const scale = cw / info.width;
+
+        // Draw strokes on thumbnail
+        if (strokes && strokes.length > 0) {
+            strokes.forEach(stroke => {
+                if (stroke.points.length < 2) return;
+
+                ctx.strokeStyle = stroke.color;
+                ctx.lineWidth = Math.max(1, stroke.size * scale);
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+
+                if (stroke.tool === 'eraser') {
+                    ctx.globalCompositeOperation = 'destination-out';
+                } else {
+                    ctx.globalCompositeOperation = 'source-over';
+                }
+
+                ctx.beginPath();
+                const firstPoint = stroke.points[0];
+                ctx.moveTo(firstPoint.x * scale, firstPoint.y * scale);
+
+                for (let i = 1; i < stroke.points.length; i++) {
+                    const point = stroke.points[i];
+                    ctx.lineTo(point.x * scale, point.y * scale);
+                }
+                ctx.stroke();
+            });
+
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
         // Draw the viewport rectangle
         // The viewState includes x,y (center) and zoom (screen pixels / image pixels)
         // We need to map the visible area of the *main container* onto this thumbnail.
@@ -106,9 +142,6 @@ export default function ImagePreview({
         
         const visibleLeft = viewState.x - visibleW / 2;
         const visibleTop = viewState.y - visibleH / 2;
-
-        // Scale to thumbnail
-        const scale = cw / info.width;
         
         const rectX = visibleLeft * scale;
         const rectY = visibleTop * scale;
@@ -124,10 +157,10 @@ export default function ImagePreview({
         ctx.fillRect(rectX, rectY, rectW, rectH);
     };
 
-    // Redraw when view changes
+    // Redraw when view changes or strokes change
     useEffect(() => {
         requestAnimationFrame(drawThumbnail);
-    }, [viewState, previewSrc, containerW, containerH]);
+    }, [viewState, previewSrc, containerW, containerH, strokes]);
 
     // Handle interaction
     const handlePointerMove = (e: React.PointerEvent) => {

@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Slider, Button, Switch } from "antd";
-import { PlusOutlined, MinusOutlined, CompressOutlined, EditOutlined } from "@ant-design/icons";
 import { useRest } from "../../hooks/rest";
-import ImagePreview from "./preview"; // New import
-import DrawingCanvas from "../drawing/DrawingCanvas";
+import ImagePreview from "./preview";
+import DrawingCanvas, { type DrawingStroke, type DrawingTool } from "../drawing/DrawingCanvas";
+import Toolbox from "./Toolbox";
 
 interface ImageViewerProps {
     imageId: string;
@@ -32,7 +31,14 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
 
     const [isDragging, setIsDragging] = useState(false);
     const lastMousePos = useRef<{ x: number, y: number } | null>(null);
-    const [drawingMode, setDrawingMode] = useState(false);
+    const [mode, setMode] = useState<'pan' | 'draw'>('pan');
+    const [strokes, setStrokes] = useState<DrawingStroke[]>([]);
+    const [redoStack, setRedoStack] = useState<DrawingStroke[]>([]);
+    
+    // Drawing tool state
+    const [drawingTool, setDrawingTool] = useState<DrawingTool>('pen');
+    const [color, setColor] = useState('#FF0000');
+    const [brushSize, setBrushSize] = useState(3);
 
     // 1. Fetch image info
     const { data: info, refetch } = useQuery<any>({
@@ -268,13 +274,13 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
     }, []); // Empty deps = bind once
 
     const handleMouseDown = (e: React.MouseEvent) => {
-        if (drawingMode) return; // Don't pan when drawing
+        if (mode === 'draw') return; // Don't pan when drawing
         setIsDragging(true);
         lastMousePos.current = { x: e.clientX, y: e.clientY };
     };
 
     const handleMouseUp = () => {
-        if (drawingMode) return;
+        if (mode === 'draw') return;
         setIsDragging(false);
         lastMousePos.current = null;
         checkBounds();
@@ -322,7 +328,7 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
-        if (drawingMode) return; // Don't pan when drawing
+        if (mode === 'draw') return; // Don't pan when drawing
         if (!isDragging || !lastMousePos.current) return;
         const dx = e.clientX - lastMousePos.current.x;
         const dy = e.clientY - lastMousePos.current.y;
@@ -351,6 +357,34 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
         const initialZoom = Math.min(scaleX, scaleY);
         // Animate instead of hard set for better feel
         animateTo({ x: info.width / 2, y: info.height / 2, zoom: initialZoom });
+    };
+
+    // Drawing action handlers
+    const handleUndo = () => {
+        if (strokes.length === 0) return;
+        const lastStroke = strokes[strokes.length - 1];
+        setRedoStack(prev => [...prev, lastStroke]);
+        setStrokes(prev => prev.slice(0, -1));
+    };
+
+    const handleRedo = () => {
+        if (redoStack.length === 0) return;
+        const strokeToRedo = redoStack[redoStack.length - 1];
+        setStrokes(prev => [...prev, strokeToRedo]);
+        setRedoStack(prev => prev.slice(0, -1));
+    };
+
+    const handleClearCanvas = () => {
+        setStrokes([]);
+        setRedoStack([]);
+    };
+
+    // Clear redo stack when new stroke is added
+    const handleStrokesChange = (newStrokes: DrawingStroke[]) => {
+        if (newStrokes.length > strokes.length) {
+            setRedoStack([]);
+        }
+        setStrokes(newStrokes);
     };
 
     // Redraw when state changes
@@ -388,66 +422,34 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                 backgroundColor: "#111", 
                 position: "relative", 
                 overflow: "hidden", 
-                cursor: drawingMode ? "crosshair" : "move"
+                cursor: mode === 'draw' ? "crosshair" : "move"
             }}
             onMouseDown={handleMouseDown}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
             onMouseMove={handleMouseMove}
         >
-            <div style={{ 
-                position: "absolute", 
-                left: 16, 
-                top: 16, 
-                zIndex: 300, 
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: 6, 
-                padding: '8px 4px', 
-                background: 'rgba(30,30,30,0.85)', 
-                borderRadius: 6,
-                backdropFilter: 'blur(4px)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.5)'
-            }} 
-            onMouseDown={e => e.stopPropagation()}>
-                {/* Drawing mode toggle */}
-                <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 8,
-                    paddingBottom: 8,
-                    marginBottom: 8,
-                    borderBottom: '1px solid rgba(255,255,255,0.1)'
-                }}>
-                    <Switch 
-                        checked={drawingMode}
-                        onChange={setDrawingMode}
-                        size="small"
-                    />
-                    <span style={{ color: '#eee', fontSize: 12 }}>
-                        <EditOutlined style={{ marginRight: 4 }} />
-                        Dessin
-                    </span>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-                    <Button type="text" icon={<PlusOutlined style={{ color: '#eee' }} />} size="small" onClick={() => zoomBy(1.25)} />
-                    <div style={{ height: 100, padding: '8px 0' }}>
-                        <Slider
-                            vertical
-                            min={0.01}
-                            max={1}
-                            step={0.01}
-                            value={viewState.zoom}
-                            onChange={(value: number) => setViewState(prev => ({ ...prev, zoom: value }))}
-                            tooltip={{ formatter: (value: number | undefined) => `Zoom: ${Math.round((value || 0) * 100)}%`, placement: 'right' }}
-                        />
-                    </div>
-                    <Button type="text" icon={<MinusOutlined style={{ color: '#eee' }} />} size="small" onClick={() => zoomBy(1 / 1.25)} />
-                    <Button type="text" icon={<CompressOutlined style={{ color: '#eee' }} />} size="small" onClick={fitToScreen} title="Fit to screen" />
-                </div>
-            </div>
+            {/* Unified Toolbox */}
+            <Toolbox
+                mode={mode}
+                onModeChange={setMode}
+                zoom={viewState.zoom}
+                onZoomChange={(value) => setViewState(prev => ({ ...prev, zoom: value }))}
+                onZoomIn={() => zoomBy(1.25)}
+                onZoomOut={() => zoomBy(1 / 1.25)}
+                onFitToScreen={fitToScreen}
+                drawingTool={drawingTool}
+                onDrawingToolChange={setDrawingTool}
+                color={color}
+                onColorChange={setColor}
+                brushSize={brushSize}
+                onBrushSizeChange={setBrushSize}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+                onClear={handleClearCanvas}
+                canUndo={strokes.length > 0}
+                canRedo={redoStack.length > 0}
+            />
 
             {/* Thumbnail preview */}
             <div style={{ position: 'absolute', right: 16, top: 16, zIndex: 300 }}>
@@ -459,6 +461,7 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                     get={get}
                     containerW={containerRef.current?.clientWidth || 0}
                     containerH={containerRef.current?.clientHeight || 0}
+                    strokes={strokes}
                 />
             </div>
 
@@ -468,11 +471,16 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
             />
 
             {/* Drawing layer overlay */}
-            {drawingMode && containerRef.current && (
+            {mode === 'draw' && containerRef.current && (
                 <DrawingCanvas
                     width={containerRef.current.clientWidth}
                     height={containerRef.current.clientHeight}
                     viewState={viewState}
+                    strokes={strokes}
+                    onStrokesChange={handleStrokesChange}
+                    tool={drawingTool}
+                    color={color}
+                    brushSize={brushSize}
                 />
             )}
         </div>

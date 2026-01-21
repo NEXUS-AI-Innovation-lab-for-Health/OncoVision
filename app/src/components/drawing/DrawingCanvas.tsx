@@ -1,11 +1,4 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Button, Slider, Popover } from "antd";
-import { 
-    BgColorsOutlined, 
-    ClearOutlined,
-    UndoOutlined
-} from "@ant-design/icons";
-import { FaPen, FaEraser } from "react-icons/fa";
 
 export type DrawingTool = 'pen' | 'eraser';
 
@@ -13,9 +6,14 @@ interface DrawingCanvasProps {
     width: number;
     height: number;
     viewState: { x: number; y: number; zoom: number };
+    strokes?: DrawingStroke[];
+    onStrokesChange?: (strokes: DrawingStroke[]) => void;
+    tool?: DrawingTool;
+    color?: string;
+    brushSize?: number;
 }
 
-interface DrawingPoint {
+export interface DrawingPoint {
     x: number;
     y: number;
     tool: DrawingTool;
@@ -23,41 +21,60 @@ interface DrawingPoint {
     size: number;
 }
 
-interface DrawingStroke {
+export interface DrawingStroke {
     points: DrawingPoint[];
     tool: DrawingTool;
     color: string;
     size: number;
 }
 
-const COLORS = [
-    '#FF0000', // Red
-    '#00FF00', // Green
-    '#0000FF', // Blue
-    '#FFFF00', // Yellow
-    '#FF00FF', // Magenta
-    '#00FFFF', // Cyan
-    '#FFFFFF', // White
-    '#000000', // Black
-    '#FFA500', // Orange
-    '#800080', // Purple
-];
-
 export default function DrawingCanvas({ 
     width, 
     height, 
-    viewState
+    viewState,
+    strokes: externalStrokes,
+    onStrokesChange,
+    tool: externalTool,
+    color: externalColor,
+    brushSize: externalBrushSize
 }: DrawingCanvasProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
-    const [tool, setTool] = useState<DrawingTool>('pen');
-    const [color, setColor] = useState('#FF0000');
-    const [brushSize, setBrushSize] = useState(3);
-    const [strokes, setStrokes] = useState<DrawingStroke[]>([]);
+    const [tool, setTool] = useState<DrawingTool>(externalTool || 'pen');
+    const [color, setColor] = useState(externalColor || '#FF0000');
+    const [brushSize, setBrushSize] = useState(externalBrushSize || 3);
+    const [strokes, setStrokes] = useState<DrawingStroke[]>(externalStrokes || []);
     const [currentStroke, setCurrentStroke] = useState<DrawingPoint[]>([]);
     
     const viewStateRef = useRef(viewState);
     const strokesRef = useRef(strokes);
+
+    // Sync with external props
+    useEffect(() => {
+        if (externalTool !== undefined) setTool(externalTool);
+    }, [externalTool]);
+
+    useEffect(() => {
+        if (externalColor !== undefined) setColor(externalColor);
+    }, [externalColor]);
+
+    useEffect(() => {
+        if (externalBrushSize !== undefined) setBrushSize(externalBrushSize);
+    }, [externalBrushSize]);
+
+    // Sync with external strokes if provided
+    useEffect(() => {
+        if (externalStrokes) {
+            setStrokes(externalStrokes);
+        }
+    }, [externalStrokes]);
+
+    // Notify parent of stroke changes
+    useEffect(() => {
+        if (onStrokesChange) {
+            onStrokesChange(strokes);
+        }
+    }, [strokes, onStrokesChange]);
 
     useEffect(() => {
         viewStateRef.current = viewState;
@@ -226,171 +243,25 @@ export default function DrawingCanvas({
         setIsDrawing(false);
     };
 
-    const handleClearCanvas = () => {
-        setStrokes([]);
-        setCurrentStroke([]);
-        const canvas = canvasRef.current;
-        const ctx = canvas?.getContext('2d');
-        if (ctx) {
-            ctx.clearRect(0, 0, width, height);
-        }
-    };
-
-    const handleUndo = () => {
-        setStrokes(prev => prev.slice(0, -1));
-    };
-
-    const colorPicker = (
-        <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(5, 1fr)', 
-            gap: 8,
-            padding: 8 
-        }}>
-            {COLORS.map(c => (
-                <div
-                    key={c}
-                    onClick={() => setColor(c)}
-                    style={{
-                        width: 32,
-                        height: 32,
-                        backgroundColor: c,
-                        border: color === c ? '3px solid #1890ff' : '1px solid #ccc',
-                        cursor: 'pointer',
-                        borderRadius: 4,
-                    }}
-                />
-            ))}
-        </div>
-    );
+    // Use external handlers if provided, otherwise use internal ones (though not used anymore since handlers moved to parent)
 
     return (
-        <>
-            {/* Drawing canvas overlay */}
-            <canvas
-                ref={canvasRef}
-                width={width}
-                height={height}
-                style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    pointerEvents: 'auto',
-                    cursor: 'crosshair',
-                    zIndex: 200
-                }}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-            />
-
-            {/* Drawing tools panel */}
-            <div style={{
+        <canvas
+            ref={canvasRef}
+            width={width}
+            height={height}
+            style={{
                 position: 'absolute',
-                right: 16,
-                bottom: 16,
-                zIndex: 300,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8,
-                padding: '12px',
-                background: 'rgba(30,30,30,0.9)',
-                borderRadius: 8,
-                backdropFilter: 'blur(8px)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                boxShadow: '0 2px 12px rgba(0,0,0,0.6)'
+                top: 0,
+                left: 0,
+                pointerEvents: 'auto',
+                cursor: 'crosshair',
+                zIndex: 200
             }}
-            onMouseDown={e => e.stopPropagation()}>
-                <div style={{ 
-                    color: '#eee', 
-                    fontSize: 14, 
-                    fontWeight: 600,
-                    marginBottom: 4,
-                    textAlign: 'center'
-                }}>
-                    Outils de dessin
-                </div>
-
-                {/* Tool selection */}
-                <div style={{ display: 'flex', gap: 6 }}>
-                    <Button
-                        type={tool === 'pen' ? 'primary' : 'default'}
-                        icon={<FaPen />}
-                        onClick={() => setTool('pen')}
-                        size="small"
-                    />
-                    <Button
-                        type={tool === 'eraser' ? 'primary' : 'default'}
-                        icon={<FaEraser />}
-                        onClick={() => setTool('eraser')}
-                        size="small"
-                    />
-                </div>
-
-                {/* Color picker */}
-                {tool === 'pen' && (
-                    <Popover content={colorPicker} trigger="click" placement="left">
-                        <Button
-                            icon={<BgColorsOutlined />}
-                            size="small"
-                            style={{
-                                borderColor: color,
-                                backgroundColor: color,
-                            }}
-                        >
-                            Couleur
-                        </Button>
-                    </Popover>
-                )}
-
-                {/* Brush size */}
-                <div style={{ 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    gap: 4,
-                    padding: '8px 4px'
-                }}>
-                    <span style={{ color: '#ccc', fontSize: 12 }}>
-                        Taille: {brushSize}px
-                    </span>
-                    <Slider
-                        min={1}
-                        max={20}
-                        value={brushSize}
-                        onChange={setBrushSize}
-                        style={{ width: 100 }}
-                    />
-                </div>
-
-                {/* Actions */}
-                <div style={{ 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    gap: 4,
-                    borderTop: '1px solid rgba(255,255,255,0.1)',
-                    paddingTop: 8
-                }}>
-                    <Button
-                        icon={<UndoOutlined />}
-                        onClick={handleUndo}
-                        disabled={strokes.length === 0}
-                        size="small"
-                        block
-                    >
-                        Annuler
-                    </Button>
-                    <Button
-                        icon={<ClearOutlined />}
-                        onClick={handleClearCanvas}
-                        danger
-                        size="small"
-                        block
-                    >
-                        Effacer tout
-                    </Button>
-                </div>
-            </div>
-        </>
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+        />
     );
 }
