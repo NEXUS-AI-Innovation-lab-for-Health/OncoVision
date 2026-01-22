@@ -61,7 +61,6 @@ export default function ImagePreview({
                     };
                     img.onerror = () => {
                          // Fallback? Try level 0 if calculated level fails
-                         console.warn("Preview tile load failed", targetLevel);
                          URL.revokeObjectURL(url);
                     };
                     img.src = url;

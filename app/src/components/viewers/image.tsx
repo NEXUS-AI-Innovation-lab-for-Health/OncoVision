@@ -100,7 +100,6 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
     const { data: info, refetch } = useQuery<any>({
         queryKey: ["viewer", "images", imageId, "info"],
         queryFn: async () => {
-            console.log("Fetching info for", imageId);
             return await get({ endpoint: `viewer/images/${imageId}/info` });
         },
         enabled: !!imageId,
@@ -116,7 +115,6 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
 
     // Initialize view to center when info arrives
     useEffect(() => {
-        console.log("Image info loaded:", info);
         if (info && containerRef.current) {
             const containerW = containerRef.current.clientWidth;
             const containerH = containerRef.current.clientHeight;
