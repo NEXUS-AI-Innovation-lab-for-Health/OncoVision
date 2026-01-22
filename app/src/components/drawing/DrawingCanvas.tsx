@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useLayoutEffect } from "react";
 
 export type DrawingTool = 'pen' | 'eraser';
 
@@ -96,7 +96,9 @@ export default function DrawingCanvas({
     };
 
     // Redraw all strokes when canvas size changes or view changes
-    useEffect(() => {
+    // Use useLayoutEffect to ensure drawing happens synchronously with DOM updates
+    // to prevent desynchronization with the underlying image canvas
+    useLayoutEffect(() => {
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext('2d');
         if (!canvas || !ctx) return;

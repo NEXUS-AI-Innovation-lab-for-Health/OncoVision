@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useLayoutEffect } from "react";
 import { useRest } from "../../hooks/rest";
 import ImagePreview from "./preview";
 import DrawingCanvas, { type DrawingStroke, type DrawingTool } from "../drawing/DrawingCanvas";
-import Toolbox from "./Toolbox";
+import Toolbox from "./toolbox";
 
 interface ImageViewerProps {
     imageId: string;
@@ -388,8 +388,8 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
     };
 
     // Redraw when state changes
-    useEffect(() => {
-        requestAnimationFrame(draw);
+    useLayoutEffect(() => {
+        draw();
     }, [draw, viewState]);
 
     // Redraw when image changes
