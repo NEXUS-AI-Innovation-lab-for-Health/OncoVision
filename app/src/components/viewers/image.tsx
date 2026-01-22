@@ -642,6 +642,8 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                 height={canvasSize.h}
                 activeTool={activeTool}
                 onDrawingActiveChange={setIsDrawingActive}
+                imageWidth={info.width}
+                imageHeight={info.height}
             />
         </div>
     );

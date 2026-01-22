@@ -31,6 +31,9 @@ interface CanvaProps {
     initialShapes?: Shape[];
     onShapeCreated?: (shape: Shape) => void;
     onDrawingActiveChange?: (active: boolean) => void;
+    // Optional image bounds (in image pixel coordinates). If provided, drawing is limited to these bounds.
+    imageWidth?: number;
+    imageHeight?: number;
 }
 
 export interface CanvaHandle {
@@ -48,6 +51,8 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     initialShapes = [],
     onShapeCreated,
     onDrawingActiveChange,
+    imageWidth,
+    imageHeight,
 }: CanvaProps, ref) {
     const [internalTool] = useState<CanvaTool>("pan");
     const resolvedTool = activeTool ?? internalTool;
@@ -120,6 +125,19 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         };
     };
 
+    const isPointInImage = (p: Point) => {
+        if (typeof imageWidth !== 'number' || typeof imageHeight !== 'number') return true;
+        return p.x >= 0 && p.x <= imageWidth && p.y >= 0 && p.y <= imageHeight;
+    };
+
+    const clampPointToImage = (p: Point): Point => {
+        if (typeof imageWidth !== 'number' || typeof imageHeight !== 'number') return p;
+        return {
+            x: Math.max(0, Math.min(imageWidth, p.x)),
+            y: Math.max(0, Math.min(imageHeight, p.y)),
+        };
+    };
+
     const commitShapeIfReady = (force?: boolean) => {
         if (!cursorRef.current) return;
         const shape = cursorRef.current.finish(force);
@@ -135,9 +153,12 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     const handlePointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
         if (resolvedTool === "pan" || !cursorRef.current) return;
         e.stopPropagation();
-        (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
 
         const point = toImagePoint(e);
+        // Do not start drawing if the user pressed outside the image (black margins)
+        if (!isPointInImage(point)) return;
+
+        (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
         cursorRef.current.press(point);
         setPreviewShape(cursorRef.current.createPreview());
         setIsDrawing(true);
@@ -145,16 +166,29 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     };
 
     const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
-        if (!isDrawing || !cursorRef.current) return;
+        // If not drawing, update cursor feedback to indicate writable area
+        if (!isDrawing || !cursorRef.current) {
+            if (resolvedTool !== "pan") {
+                const pt = toImagePoint(e);
+                try {
+                    (e.currentTarget as SVGSVGElement).style.cursor = isPointInImage(pt) ? 'crosshair' : 'not-allowed';
+                } catch {}
+            }
+            return;
+        }
+
         const point = toImagePoint(e);
-        cursorRef.current.move(point);
+        // Keep drawing but clamp movements to image bounds so we never draw outside
+        const clamped = clampPointToImage(point);
+        cursorRef.current.move(clamped);
         setPreviewShape(cursorRef.current.createPreview());
     };
 
     const handlePointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
         if (!isDrawing || !cursorRef.current) return;
         const point = toImagePoint(e);
-        cursorRef.current.release(point);
+        const clamped = clampPointToImage(point);
+        cursorRef.current.release(clamped);
         commitShapeIfReady();
         onDrawingActiveChange?.(false);
         try {
