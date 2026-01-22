@@ -25,7 +25,7 @@ class ImageInfo:
 
 def detect_format_from_path(path: Path) -> ImageFormat | None:
 	suffix = path.suffix.lower()
-	if suffix in {".dcm"}:
+	if suffix in {".dcm", ".dicom"}:
 		return "DICOM"
 	if suffix in {".svs", ".dsv"}:
 		return "SVS"
@@ -118,12 +118,41 @@ def load_dicom_as_pillow(path: Path) -> Image.Image:
 	except Exception:
 		apply_voi_lut = None
 
-	arr = ds.pixel_array
+	try:
+		arr = ds.pixel_array
+	except Exception as e:
+		transfer_syntax = getattr(getattr(ds, "file_meta", None), "TransferSyntaxUID", None)
+		raise ValueError(
+			"Impossible de décoder les pixels DICOM. "
+			f"TransferSyntaxUID={transfer_syntax}. "
+			"Installez un décodage DICOM compressé (pylibjpeg, "
+			"pylibjpeg-libjpeg, pylibjpeg-openjpeg ou gdcm). "
+			f"Erreur d'origine: {e}"
+		) from e
 	if apply_voi_lut is not None:
 		try:
 			arr = apply_voi_lut(arr, ds)
 		except Exception:
 			pass
+
+	# Gère les cas où pixel_array a plus de 2 dimensions (multi-frame, couleurs, etc.)
+	while arr.ndim > 3:
+		arr = arr[0]
+
+	if arr.ndim == 3:
+		# Données couleur en première dimension (3xHxW ou 4xHxW)
+		if arr.shape[0] in {3, 4} and arr.shape[2] not in {3, 4}:
+			arr = np.moveaxis(arr, 0, 2)
+		# Si ce n'est pas une image couleur, on squeeze les dimensions unitaires
+		if arr.shape[2] not in {3, 4}:
+			arr = np.squeeze(arr)
+
+	# Après squeeze, assure une image 2D pour le niveau de gris
+	if arr.ndim == 1:
+		arr = arr.reshape(1, -1)
+	if arr.ndim > 2:
+		while arr.ndim > 2:
+			arr = arr[0]
 
 	intercept = float(getattr(ds, "RescaleIntercept", 0.0) or 0.0)
 	slope = float(getattr(ds, "RescaleSlope", 1.0) or 1.0)
@@ -151,9 +180,13 @@ def load_dicom_as_pillow(path: Path) -> Image.Image:
 	else:
 		out = ((arr - low) / (high - low) * 255.0).astype(np.uint8)
 
-	img = Image.fromarray(out, mode="L")
+	# Création d'image selon le nombre de canaux
+	if out.ndim == 3 and out.shape[2] in {3, 4}:
+		img = Image.fromarray(out, mode="RGBA" if out.shape[2] == 4 else "RGB")
+	else:
+		img = Image.fromarray(out, mode="L")
 	photometric = getattr(ds, "PhotometricInterpretation", "MONOCHROME2")
-	if str(photometric).upper() == "MONOCHROME1":
+	if img.mode == "L" and str(photometric).upper() == "MONOCHROME1":
 		img = ImageOps.invert(img)
 	return img
 

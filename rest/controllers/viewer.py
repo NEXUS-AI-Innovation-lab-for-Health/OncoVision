@@ -47,6 +47,7 @@ class ViewerController(Controller):
 
         if kind is None:
             detected = detect_format_from_path(Path(filename))
+            print(f"Detected image format: {detected}")
             if detected is None:
                 raise HTTPException(status_code=400, detail="Could not detect image format from filename. Please specify 'kind' explicitly.")
             kind = detected
