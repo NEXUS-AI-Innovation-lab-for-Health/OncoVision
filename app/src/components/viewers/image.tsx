@@ -3,6 +3,7 @@ import { Slider, Button } from "antd";
 import { PlusOutlined, MinusOutlined, CompressOutlined } from "@ant-design/icons";
 import { useRest } from "../../hooks/rest";
 import ImagePreview from "./preview"; // New import
+import Canva from "./canva";
 
 interface ImageViewerProps {
     imageId: string;
@@ -31,6 +32,8 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
 
     const [isDragging, setIsDragging] = useState(false);
     const lastMousePos = useRef<{ x: number, y: number } | null>(null);
+    const [isDrawingActive, setIsDrawingActive] = useState(false);
+    const [canvasSize, setCanvasSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
 
     // 1. Fetch image info
     const { data: info, refetch } = useQuery<any>({
@@ -266,11 +269,13 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
     }, []); // Empty deps = bind once
 
     const handleMouseDown = (e: React.MouseEvent) => {
+        if (isDrawingActive) return;
         setIsDragging(true);
         lastMousePos.current = { x: e.clientX, y: e.clientY };
     };
 
     const handleMouseUp = () => {
+        if (isDrawingActive) return;
         setIsDragging(false);
         lastMousePos.current = null;
         checkBounds();
@@ -318,6 +323,7 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
+        if (isDrawingActive) return;
         if (!isDragging || !lastMousePos.current) return;
         const dx = e.clientX - lastMousePos.current.x;
         const dy = e.clientY - lastMousePos.current.y;
@@ -361,13 +367,18 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
     // Resize observer to adjust canvas size
     useEffect(() => {
         if (!containerRef.current || !canvasRef.current) return;
-        const resizeObserver = new ResizeObserver(() => {
-            if (containerRef.current && canvasRef.current) {
-                canvasRef.current.width = containerRef.current.clientWidth;
-                canvasRef.current.height = containerRef.current.clientHeight;
-                requestAnimationFrame(draw);
-            }
-        });
+        const updateSize = () => {
+            if (!containerRef.current || !canvasRef.current) return;
+            canvasRef.current.width = containerRef.current.clientWidth;
+            canvasRef.current.height = containerRef.current.clientHeight;
+            setCanvasSize({
+                w: containerRef.current.clientWidth,
+                h: containerRef.current.clientHeight,
+            });
+            requestAnimationFrame(draw);
+        };
+        const resizeObserver = new ResizeObserver(updateSize);
+        updateSize();
         resizeObserver.observe(containerRef.current);
         return () => resizeObserver.disconnect();
     }, [draw]);
@@ -440,6 +451,13 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
             <canvas 
                 ref={canvasRef} 
                 style={{ display: "block", width: "100%", height: "100%" }} 
+            />
+
+            <Canva
+                viewState={viewState}
+                width={canvasSize.w}
+                height={canvasSize.h}
+                onDrawingActiveChange={setIsDrawingActive}
             />
         </div>
     );
