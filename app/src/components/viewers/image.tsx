@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Slider, Button } from "antd";
-import { PlusOutlined, MinusOutlined, CompressOutlined } from "@ant-design/icons";
+import { Slider, Button, Tooltip } from "antd";
+import { FiZoomIn, FiZoomOut, FiMaximize2 } from "react-icons/fi";
 import { useRest } from "../../hooks/rest";
 import ImagePreview from "./preview"; // New import
 import Canva from "./canva";
@@ -364,8 +364,9 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
         refetch();
     }, [imageId, refetch]);
 
-    // Resize observer to adjust canvas size
+    // Resize observer to adjust canvas size (rerun on image change)
     useEffect(() => {
+        if (!info) return;
         if (!containerRef.current || !canvasRef.current) return;
         const updateSize = () => {
             if (!containerRef.current || !canvasRef.current) return;
@@ -381,7 +382,7 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
         updateSize();
         resizeObserver.observe(containerRef.current);
         return () => resizeObserver.disconnect();
-    }, [draw]);
+    }, [draw, info]);
 
     if (!info) return <div style={{ color: "white" }}>Chargement des métadonnées...</div>;
 
@@ -408,18 +409,27 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                 zIndex: 300, 
                 display: 'flex', 
                 flexDirection: 'column', 
-                gap: 6, 
-                padding: '8px 4px', 
-                background: 'rgba(30,30,30,0.85)', 
-                borderRadius: 6,
-                backdropFilter: 'blur(4px)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.5)'
+                gap: 8, 
+                padding: '10px 8px', 
+                background: 'linear-gradient(180deg, rgba(25,25,28,0.92), rgba(18,18,20,0.85))', 
+                borderRadius: 12,
+                backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.45)'
             }} 
             onMouseDown={e => e.stopPropagation()}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-                    <Button type="text" icon={<PlusOutlined style={{ color: '#eee' }} />} size="small" onClick={() => zoomBy(1.25)} />
-                    <div style={{ height: 100, padding: '8px 0' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+                    <Tooltip title="Zoom +" placement="right">
+                        <Button
+                            type="text"
+                            shape="circle"
+                            size="small"
+                            icon={<FiZoomIn size={16} />}
+                            onClick={() => zoomBy(1.25)}
+                            style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
+                        />
+                    </Tooltip>
+                    <div style={{ height: 110, padding: '6px 0' }}>
                         <Slider
                             vertical
                             min={0.01}
@@ -430,8 +440,27 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                             tooltip={{ formatter: (value: number | undefined) => `Zoom: ${Math.round((value || 0) * 100)}%`, placement: 'right' }}
                         />
                     </div>
-                    <Button type="text" icon={<MinusOutlined style={{ color: '#eee' }} />} size="small" onClick={() => zoomBy(1 / 1.25)} />
-                    <Button type="text" icon={<CompressOutlined style={{ color: '#eee' }} />} size="small" onClick={fitToScreen} title="Fit to screen" />
+                    <Tooltip title="Zoom -" placement="right">
+                        <Button
+                            type="text"
+                            shape="circle"
+                            size="small"
+                            icon={<FiZoomOut size={16} />}
+                            onClick={() => zoomBy(1 / 1.25)}
+                            style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
+                        />
+                    </Tooltip>
+                    <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
+                    <Tooltip title="Ajuster à l'écran" placement="right">
+                        <Button
+                            type="text"
+                            shape="circle"
+                            size="small"
+                            icon={<FiMaximize2 size={16} />}
+                            onClick={fitToScreen}
+                            style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
+                        />
+                    </Tooltip>
                 </div>
             </div>
 
