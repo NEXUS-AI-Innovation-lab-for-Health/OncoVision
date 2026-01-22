@@ -1,6 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { Button } from "antd";
 import {
     CircleCursor,
     DrawingCursor,
@@ -26,6 +25,7 @@ interface CanvaProps {
     viewState: CanvaViewState;
     width: number;
     height: number;
+    activeTool?: CanvaTool;
     strokeColor?: string;
     strokeWidth?: number;
     initialShapes?: Shape[];
@@ -42,14 +42,15 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     viewState,
     width,
     height,
+    activeTool,
     strokeColor = "#ff3b30",
     strokeWidth = 2,
     initialShapes = [],
     onShapeCreated,
     onDrawingActiveChange,
 }: CanvaProps, ref) {
-
-    const [activeTool, setActiveTool] = useState<CanvaTool>("pan");
+    const [internalTool] = useState<CanvaTool>("pan");
+    const resolvedTool = activeTool ?? internalTool;
     const cursorRef = useRef<DrawingCursor | null>(null);
     const [shapes, setShapes] = useState<Shape[]>(initialShapes);
     const [previewShape, setPreviewShape] = useState<Shape | null>(null);
@@ -61,7 +62,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     }, [viewState]);
 
     useEffect(() => {
-        if (activeTool === "pan") {
+        if (resolvedTool === "pan") {
             cursorRef.current = null;
             setPreviewShape(null);
             setIsDrawing(false);
@@ -88,11 +89,11 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
             }
         };
 
-        cursorRef.current = createCursor(activeTool);
+        cursorRef.current = createCursor(resolvedTool);
         setPreviewShape(null);
         setIsDrawing(false);
         onDrawingActiveChange?.(false);
-    }, [activeTool, strokeColor, strokeWidth]);
+    }, [resolvedTool, strokeColor, strokeWidth]);
 
     const addShape = (shape: Shape) => {
         setShapes((prev) => [...prev, shape]);
@@ -105,7 +106,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         setIsDrawing(false);
     };
 
-    useImperativeHandle(ref, () => ({ addShape, clear }), [addShape]);
+    useImperativeHandle(ref, () => ({ addShape, clear }), [addShape, clear]);
 
     const toImagePoint = (e: React.PointerEvent<SVGSVGElement>): Point => {
         const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
@@ -132,7 +133,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     };
 
     const handlePointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
-        if (activeTool === "pan" || !cursorRef.current) return;
+        if (resolvedTool === "pan" || !cursorRef.current) return;
         e.stopPropagation();
         (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
 
@@ -172,7 +173,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     };
 
     const handleDoubleClick = (e: React.MouseEvent<SVGSVGElement>) => {
-        if (activeTool !== "polygon") return;
+        if (resolvedTool !== "polygon") return;
         e.stopPropagation();
         commitShapeIfReady(true);
     };
@@ -180,99 +181,22 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     const canvaStyle = useMemo<CSSProperties>(() => ({
         position: "absolute",
         inset: 0,
-        pointerEvents: activeTool === "pan" ? "none" : "auto",
-    }), [activeTool]);
+        pointerEvents: resolvedTool === "pan" ? "none" : "auto",
+    }), [resolvedTool]);
 
     const canRenderSvg = width > 0 && height > 0;
 
     return (
         <>
-            <div
-                style={{
-                    position: "absolute",
-                    left: 16,
-                    top: 170,
-                    zIndex: 320,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 6,
-                    padding: "8px 6px",
-                    background: "rgba(30,30,30,0.85)",
-                    borderRadius: 6,
-                    backdropFilter: "blur(4px)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-            >
-                <Button
-                    type={activeTool === "pan" ? "primary" : "text"}
-                    size="small"
-                    onClick={() => setActiveTool("pan")}
-                >
-                    Pan
-                </Button>
-                <Button
-                    type={activeTool === "pensil" ? "primary" : "text"}
-                    size="small"
-                    onClick={() => setActiveTool("pensil")}
-                >
-                    Crayon
-                </Button>
-                <Button
-                    type={activeTool === "line" ? "primary" : "text"}
-                    size="small"
-                    onClick={() => setActiveTool("line")}
-                >
-                    Ligne
-                </Button>
-                <Button
-                    type={activeTool === "rectangle" ? "primary" : "text"}
-                    size="small"
-                    onClick={() => setActiveTool("rectangle")}
-                >
-                    Rectangle
-                </Button>
-                <Button
-                    type={activeTool === "circle" ? "primary" : "text"}
-                    size="small"
-                    onClick={() => setActiveTool("circle")}
-                >
-                    Cercle
-                </Button>
-                <Button
-                    type={activeTool === "ellipse" ? "primary" : "text"}
-                    size="small"
-                    onClick={() => setActiveTool("ellipse")}
-                >
-                    Ellipse
-                </Button>
-                <Button
-                    type={activeTool === "polygon" ? "primary" : "text"}
-                    size="small"
-                    onClick={() => setActiveTool("polygon")}
-                >
-                    Polygone
-                </Button>
-                <Button
-                    danger
-                    type="text"
-                    size="small"
-                    onClick={clear}
-                >
-                    Effacer
-                </Button>
-            </div>
-
             {canRenderSvg && (
                 <svg
                     width={width}
                     height={height}
                     viewBox={`0 0 ${width} ${height}`}
                     style={canvaStyle}
-                    onMouseDown={(e) => { if (activeTool !== "pan") e.stopPropagation(); }}
-                    onMouseMove={(e) => { if (activeTool !== "pan") e.stopPropagation(); }}
-                    onMouseUp={(e) => { if (activeTool !== "pan") e.stopPropagation(); }}
+                    onMouseDown={(e) => { if (resolvedTool !== "pan") e.stopPropagation(); }}
+                    onMouseMove={(e) => { if (resolvedTool !== "pan") e.stopPropagation(); }}
+                    onMouseUp={(e) => { if (resolvedTool !== "pan") e.stopPropagation(); }}
                     onPointerDown={handlePointerDown}
                     onPointerMove={handlePointerMove}
                     onPointerUp={handlePointerUp}

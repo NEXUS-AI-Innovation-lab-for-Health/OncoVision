@@ -4,6 +4,7 @@ import { FiZoomIn, FiZoomOut, FiMaximize2 } from "react-icons/fi";
 import { useRest } from "../../hooks/rest";
 import ImagePreview from "./preview"; // New import
 import Canva from "./canva";
+import type { CanvaHandle, CanvaTool } from "./canva";
 
 interface ImageViewerProps {
     imageId: string;
@@ -23,6 +24,7 @@ const activeFetches = new Set<string>();
 export default function ImageViewer({ imageId }: ImageViewerProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const canvaRef = useRef<CanvaHandle>(null);
     const { useQuery, get } = useRest();
 
     const [viewState, setViewState] = useState<ViewState>({ x: 0, y: 0, zoom: 0.1 });
@@ -34,6 +36,7 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
     const lastMousePos = useRef<{ x: number, y: number } | null>(null);
     const [isDrawingActive, setIsDrawingActive] = useState(false);
     const [canvasSize, setCanvasSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+    const [activeTool, setActiveTool] = useState<CanvaTool>("pan");
 
     // 1. Fetch image info
     const { data: info, refetch } = useQuery<any>({
@@ -395,7 +398,7 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                 backgroundColor: "#111", 
                 position: "relative", 
                 overflow: "hidden", 
-                cursor: "move" 
+                cursor: activeTool === "pan" ? "move" : "crosshair" 
             }}
             onMouseDown={handleMouseDown}
             onMouseUp={handleMouseUp}
@@ -409,8 +412,8 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                 zIndex: 300, 
                 display: 'flex', 
                 flexDirection: 'column', 
-                gap: 8, 
-                padding: '10px 8px', 
+                gap: 10, 
+                padding: '12px 10px', 
                 background: 'linear-gradient(180deg, rgba(25,25,28,0.92), rgba(18,18,20,0.85))', 
                 borderRadius: 12,
                 backdropFilter: 'blur(8px)',
@@ -450,7 +453,7 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                             style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
                         />
                     </Tooltip>
-                    <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
+                    <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.12)', margin: '2px 0' }} />
                     <Tooltip title="Ajuster à l'écran" placement="right">
                         <Button
                             type="text"
@@ -461,6 +464,69 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                             style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
                         />
                     </Tooltip>
+                </div>
+                <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.12)' }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <Button
+                        type={activeTool === "pan" ? "primary" : "text"}
+                        size="small"
+                        onClick={() => setActiveTool("pan")}
+                    >
+                        Pan
+                    </Button>
+                    <Button
+                        type={activeTool === "pensil" ? "primary" : "text"}
+                        size="small"
+                        onClick={() => setActiveTool("pensil")}
+                    >
+                        Crayon
+                    </Button>
+                    <Button
+                        type={activeTool === "line" ? "primary" : "text"}
+                        size="small"
+                        onClick={() => setActiveTool("line")}
+                    >
+                        Ligne
+                    </Button>
+                    <Button
+                        type={activeTool === "rectangle" ? "primary" : "text"}
+                        size="small"
+                        onClick={() => setActiveTool("rectangle")}
+                    >
+                        Rectangle
+                    </Button>
+                    <Button
+                        type={activeTool === "circle" ? "primary" : "text"}
+                        size="small"
+                        onClick={() => setActiveTool("circle")}
+                    >
+                        Cercle
+                    </Button>
+                    <Button
+                        type={activeTool === "ellipse" ? "primary" : "text"}
+                        size="small"
+                        onClick={() => setActiveTool("ellipse")}
+                    >
+                        Ellipse
+                    </Button>
+                    <Button
+                        type={activeTool === "polygon" ? "primary" : "text"}
+                        size="small"
+                        onClick={() => setActiveTool("polygon")}
+                    >
+                        Polygone
+                    </Button>
+                    <Button
+                        danger
+                        type="text"
+                        size="small"
+                        onClick={() => {
+                            canvaRef.current?.clear();
+                            setActiveTool("pan");
+                        }}
+                    >
+                        Effacer
+                    </Button>
                 </div>
             </div>
 
@@ -483,9 +549,11 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
             />
 
             <Canva
+                ref={canvaRef}
                 viewState={viewState}
                 width={canvasSize.w}
                 height={canvasSize.h}
+                activeTool={activeTool}
                 onDrawingActiveChange={setIsDrawingActive}
             />
         </div>
