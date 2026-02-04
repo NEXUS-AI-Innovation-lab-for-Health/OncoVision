@@ -29,9 +29,8 @@ interface CanvaProps {
     strokeColor?: string;
     strokeWidth?: number;
     initialShapes?: Shape[];
-    onShapeCreated?: (shape: Shape) => void;
+    onShapeCreated?: (shape: Shape, metrics: any) => void;
     onDrawingActiveChange?: (active: boolean) => void;
-    // Optional image bounds (in image pixel coordinates). If provided, drawing is limited to these bounds.
     imageWidth?: number;
     imageHeight?: number;
 }
@@ -57,7 +56,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     const [internalTool] = useState<CanvaTool>("pan");
     const resolvedTool = activeTool ?? internalTool;
     const cursorRef = useRef<DrawingCursor | null>(null);
-    const [shapes, setShapes] = useState<Shape[]>(initialShapes);
+    const [shapes, setShapes] = useState<{ shape: Shape; metrics: any }[]>([]);
     const [previewShape, setPreviewShape] = useState<Shape | null>(null);
     const [isDrawing, setIsDrawing] = useState(false);
 
@@ -101,8 +100,9 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     }, [resolvedTool, strokeColor, strokeWidth]);
 
     const addShape = (shape: Shape) => {
-        setShapes((prev) => [...prev, shape]);
-        onShapeCreated?.(shape);
+        const metrics = shape.getMetrics();
+        setShapes((prev) => [...prev, { shape, metrics }]);
+        onShapeCreated?.(shape, metrics);
     };
 
     const clear = () => {
@@ -155,7 +155,6 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         e.stopPropagation();
 
         const point = toImagePoint(e);
-        // Do not start drawing if the user pressed outside the image (black margins)
         if (!isPointInImage(point)) return;
 
         (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
@@ -166,7 +165,6 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     };
 
     const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
-        // If not drawing, update cursor feedback to indicate writable area
         if (!isDrawing || !cursorRef.current) {
             if (resolvedTool !== "pan") {
                 const pt = toImagePoint(e);
@@ -178,7 +176,6 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         }
 
         const point = toImagePoint(e);
-        // Keep drawing but clamp movements to image bounds so we never draw outside
         const clamped = clampPointToImage(point);
         cursorRef.current.move(clamped);
         setPreviewShape(cursorRef.current.createPreview());
@@ -240,8 +237,11 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                     <g
                         transform={`translate(${width / 2}, ${height / 2}) scale(${viewState.zoom}) translate(${-viewState.x}, ${-viewState.y})`}
                     >
-                        {shapes.map((shape, idx) => (
-                            <g key={`shape-${idx}`}>{shape.render()}</g>
+                        {shapes.map(({ shape, metrics }, idx) => (
+                            <g key={`shape-${idx}`}>
+                                {shape.render()}
+                                {shape.renderLabel?.(metrics)}
+                            </g>
                         ))}
                         {previewShape && <g opacity={0.7}>{previewShape.render()}</g>}
                     </g>

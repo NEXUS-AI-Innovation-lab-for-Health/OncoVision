@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 from uuid import uuid4
 import time
@@ -52,12 +53,15 @@ class ViewerController(Controller):
                 raise HTTPException(status_code=400, detail="Could not detect image format from filename. Please specify 'kind' explicitly.")
             kind = detected
 
-        # Save temporarily to process
-        temp_path = Path(f"/tmp/{uuid4().hex}_{filename}")
+        # Lire le contenu du fichier
         content = await file.read()
-        temp_path.write_bytes(content)
 
+        # Utiliser tempfile pour créer un fichier temporaire valide
         try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".svs") as temp_file:
+                temp_path = Path(temp_file.name)
+                temp_path.write_bytes(content)
+
             # Register and upload levels to S3
             print(f"Uploading image {filename} as kind {kind}...")
             started = time.perf_counter()
@@ -65,8 +69,7 @@ class ViewerController(Controller):
             elapsed = time.perf_counter() - started
             print(f"Image {filename} uploaded with id {record.id} in {elapsed:.2f}s")
 
-            # For info, we need to get dimensions - we'll need to modify registry to store this
-            # For now, return basic info
+            # Retourner les informations de l'image
             return {
                 "id": record.id,
                 "kind": record.kind,
@@ -77,9 +80,13 @@ class ViewerController(Controller):
             }
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            print(f"Erreur lors du traitement du fichier : {e}")
+            raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
         finally:
-            # Clean up temp file
-            temp_path.unlink(missing_ok=True)
+            # Nettoyer le fichier temporaire
+            if 'temp_path' in locals():
+                temp_path.unlink(missing_ok=True)
 
     def get_info(self, image_id: str):
         record = self._get_record(image_id)

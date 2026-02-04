@@ -1,5 +1,7 @@
 import os
 import dotenv
+import tempfile
+from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI
@@ -51,7 +53,6 @@ except Exception as e:
     exit(1)
 
 # Initialize s3 storage connection
-# Setup S3 Connection
 s3_credentials = S3Credentials(
     host=os.getenv("S3_HOST", "http://localhost"),
     port=int(os.getenv("S3_PORT", 9000)),
@@ -68,24 +69,18 @@ except Exception as e:
     print(f"Failed to establish S3 connection: {e}")
     exit(1)
 
-# Initialize MongoDB connection
-mongo_credentials = MongoCredentials(
-    host=os.getenv("MONGO_HOST", "localhost"),
-    port=int(os.getenv("MONGO_PORT", 27017)),
-    user=os.getenv("MONGO_USER", "user"),
-    password=os.getenv("MONGO_PASSWORD", "password"),
-    database=os.getenv("MONGO_DATABASE", "database"),
-)
-mongo_connection = None
-try:
-    mongo_connection = MongoConnection(mongo_credentials)
-    if mongo_connection.ping():
-        print("MongoDB connection established successfully.")
-    else:
-        raise Exception("Ping to MongoDB server failed.")
-except Exception as e:
-    print(f"Failed to establish MongoDB connection: {e}")
-    exit(1)
+# Exemple de fonction upload_image modifiée (à placer dans controllers/viewer.py)
+def upload_image(content):
+    try:
+        # Utilise tempfile pour créer un fichier temporaire valide
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".svs") as temp_file:
+            temp_path = Path(temp_file.name)
+            temp_path.write_bytes(content)
+        print(f"Fichier temporaire créé : {temp_path}")
+        return temp_path
+    except Exception as e:
+        print(f"Erreur lors de l'écriture du fichier temporaire : {e}")
+        raise
 
 routers = [
     ViewerController(s3_connection),

@@ -6,6 +6,7 @@ from uuid import uuid4
 from io import BytesIO
 import math
 import shutil
+import tempfile
 
 from PIL import Image
 from openslide.lowlevel import OpenSlideUnsupportedFormatError
@@ -143,7 +144,7 @@ class ImageRegistry:
 
     def _ensure_source_local(self, record: ImageRecord) -> Path:
         source_suffix = Path(record.source_key).suffix
-        local_path = Path(f"/tmp/{record.id}{source_suffix}")
+        local_path = Path(tempfile.gettempdir()) / f"{record.id}{source_suffix}"
         if local_path.exists():
             return local_path
 

@@ -1,5 +1,4 @@
 class S3Credentials:
-
     host: str = "http://localhost"
     port: int = 9000
     user: str
