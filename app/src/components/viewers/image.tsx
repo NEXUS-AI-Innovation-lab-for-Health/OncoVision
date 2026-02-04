@@ -5,6 +5,7 @@ import { useRest } from "../../hooks/rest";
 import ImagePreview from "./preview"; // New import
 import Canva from "./canva";
 import type { CanvaHandle, CanvaTool } from "./canva";
+import CanvaSocket from "./socket";
 
 // Small inline icons to avoid extra dependencies and ensure consistent look on dark background
 const ToolIcon = ({ name, size = 14 }: { name: string; size?: number }) => {
@@ -79,7 +80,10 @@ interface ViewState {
 const tileCache = new Map<string, HTMLImageElement>();
 const activeFetches = new Set<string>();
 
-export default function ImageViewer({ imageId }: ImageViewerProps) {
+export default function ImageViewer(props: ImageViewerProps) {
+
+    const { imageId } = props;
+
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const canvaRef = useRef<CanvaHandle>(null);
@@ -633,8 +637,9 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                 style={{ display: "block", width: "100%", height: "100%" }} 
             />
 
-            <Canva
-                ref={canvaRef}
+            {/* <Canva */}
+            <CanvaSocket
+                canvaRef={canvaRef}
                 viewState={viewState}
                 width={canvasSize.w}
                 height={canvasSize.h}
