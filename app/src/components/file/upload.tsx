@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { FaUpload } from "react-icons/fa";
 import { useRest } from "../../hooks/rest";
 import ImageViewer from "../viewers/image";
+import CanvaSocket from "../viewers/socket/canva";
 
 export default function ImageUploader() {
 
@@ -97,7 +98,9 @@ export default function ImageUploader() {
                 </div>
                 {previewId && (
                     <div style={{ width: '100%', height: '600px', border: '1px solid #333' }}>
-                        <ImageViewer imageId={previewId} />
+                        <ImageViewer imageId={previewId} canva={{
+                            type: CanvaSocket
+                        }} />
                     </div>
                 )}
             </div>

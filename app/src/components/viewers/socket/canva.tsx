@@ -1,9 +1,8 @@
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useRef } from "react";
 import type { CanvaHandle, CanvaProps } from "../canva";
 import Canva from "../canva";
 
 export type CanvaSocketProps = CanvaProps & {
-    handleRef?: RefObject<CanvaHandle | null>;
 }
 
 export default function CanvaSocket(props: CanvaSocketProps) {

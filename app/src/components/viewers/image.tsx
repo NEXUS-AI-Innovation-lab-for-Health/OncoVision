@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, type ComponentType } from "react";
 import { Slider, Button, Tooltip } from "antd";
 import { FiZoomIn, FiZoomOut, FiMaximize2 } from "react-icons/fi";
 import { useRest } from "../../hooks/rest";
 import ImagePreview from "./preview"; // New import
 import Canva from "./canva";
-import type { CanvaHandle, CanvaTool } from "./canva";
+import type { CanvaHandle, CanvaTool, CanvaProps } from "./canva";
 
 // Small inline icons to avoid extra dependencies and ensure consistent look on dark background
 const ToolIcon = ({ name, size = 14 }: { name: string; size?: number }) => {
@@ -66,6 +66,10 @@ const ToolIcon = ({ name, size = 14 }: { name: string; size?: number }) => {
 
 interface ImageViewerProps {
     imageId: string;
+    canva?: {
+        type: ComponentType<CanvaProps>;
+        props?: Partial<CanvaProps>;
+    };
 }
 
 interface ViewState {
@@ -81,7 +85,9 @@ const activeFetches = new Set<string>();
 
 export default function ImageViewer(props: ImageViewerProps) {
 
-    const { imageId } = props;
+    const { imageId, canva } = props;
+    const CanvaComponent = canva?.type || Canva;
+    const canvaProps = canva?.props || {};
 
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -448,6 +454,16 @@ export default function ImageViewer(props: ImageViewerProps) {
 
     if (!info) return <div style={{ color: "white" }}>Chargement des métadonnées...</div>;
 
+    const defaultCanvaProps: CanvaProps = {
+        viewState,
+        width: canvasSize.w,
+        height: canvasSize.h,
+        activeTool,
+        onDrawingActiveChange: setIsDrawingActive,
+        imageWidth: info.width,
+        imageHeight: info.height,
+    };
+
     return (
         <div 
             ref={containerRef} 
@@ -623,15 +639,10 @@ export default function ImageViewer(props: ImageViewerProps) {
                 style={{ display: "block", width: "100%", height: "100%" }} 
             />
 
-            <Canva
+            <CanvaComponent
                 ref={canvaRef}
-                viewState={viewState}
-                width={canvasSize.w}
-                height={canvasSize.h}
-                activeTool={activeTool}
-                onDrawingActiveChange={setIsDrawingActive}
-                imageWidth={info.width}
-                imageHeight={info.height}
+                {...defaultCanvaProps}
+                {...canvaProps}
             />
         </div>
     );
