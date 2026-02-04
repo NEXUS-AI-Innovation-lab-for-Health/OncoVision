@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import {
     CircleCursor,
     DrawingCursor,
@@ -34,6 +34,7 @@ export type CanvaProps = {
     // Optional image bounds (in image pixel coordinates). If provided, drawing is limited to these bounds.
     imageWidth?: number;
     imageHeight?: number;
+    children?: ReactNode;
 }
 
 export interface CanvaHandle {
@@ -54,6 +55,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     onDrawingActiveChange,
     imageWidth,
     imageHeight,
+    children,
 }: CanvaProps, ref) {
     const [internalTool] = useState<CanvaTool>("pan");
     const resolvedTool = activeTool ?? internalTool;
@@ -123,7 +125,10 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         listenerRef.current = listener;
     };
 
-    useImperativeHandle(ref, () => ({ addShape, removeShape, setListener }), [addShape, removeShape, setListener]);
+    useImperativeHandle(ref, () => {
+        const handle = { addShape, removeShape, setListener };
+        return handle;
+    }, [addShape, removeShape, setListener]);
 
     const toImagePoint = (e: React.PointerEvent<SVGSVGElement>): Point => {
         const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
@@ -228,7 +233,14 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         position: "absolute",
         inset: 0,
         pointerEvents: resolvedTool === "pan" ? "none" : "auto",
+        zIndex: 1,
     }), [resolvedTool]);
+
+    const overlayStyle = useMemo<CSSProperties>(() => ({
+        position: "absolute",
+        inset: 0,
+        zIndex: 2,
+    }), []);
 
     const canRenderSvg = width > 0 && height > 0;
 
@@ -258,6 +270,11 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                         {previewShape && <g opacity={0.7}>{previewShape.render()}</g>}
                     </g>
                 </svg>
+            )}
+            {children && (
+                <div style={overlayStyle}>
+                    {children}
+                </div>
             )}
         </>
     );
