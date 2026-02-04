@@ -38,7 +38,8 @@ export type CanvaProps = {
 
 export interface CanvaHandle {
     addShape: (shape: Shape) => void;
-    clear: () => void;
+    removeShape: (shape: Shape) => void;
+    setListener: (listener: (shape: Shape, shapes: Shape[]) => void) => void;
 }
 
 const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
@@ -60,6 +61,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     const [shapes, setShapes] = useState<Shape[]>(initialShapes);
     const [previewShape, setPreviewShape] = useState<Shape | null>(null);
     const [isDrawing, setIsDrawing] = useState(false);
+    const listenerRef = useRef<((shape: Shape, shapes: Shape[]) => void) | null>(null);
 
     const bounds: CursorBoundingBox | undefined = (imageWidth && imageHeight) ? { width: imageWidth, height: imageHeight } : undefined;
 
@@ -103,17 +105,25 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     }, [resolvedTool, strokeColor, strokeWidth, imageWidth, imageHeight]);
 
     const addShape = (shape: Shape) => {
-        setShapes((prev) => [...prev, shape]);
+        setShapes((prev) => {
+            const next = [...prev, shape];
+            listenerRef.current?.(shape, next);
+            return next;
+        });
         onShapeCreated?.(shape);
     };
 
-    const clear = () => {
-        setShapes([]);
+    const removeShape = (shape: Shape) => {
+        setShapes((prev) => prev.filter((current) => current !== shape));
         setPreviewShape(null);
         setIsDrawing(false);
     };
 
-    useImperativeHandle(ref, () => ({ addShape, clear }), [addShape, clear]);
+    const setListener = (listener: (shape: Shape, shapes: Shape[]) => void) => {
+        listenerRef.current = listener;
+    };
+
+    useImperativeHandle(ref, () => ({ addShape, removeShape, setListener }), [addShape, removeShape, setListener]);
 
     const toImagePoint = (e: React.PointerEvent<SVGSVGElement>): Point => {
         const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();

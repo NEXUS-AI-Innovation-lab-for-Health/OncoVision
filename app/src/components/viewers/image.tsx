@@ -5,7 +5,6 @@ import { useRest } from "../../hooks/rest";
 import ImagePreview from "./preview"; // New import
 import Canva from "./canva";
 import type { CanvaHandle, CanvaTool } from "./canva";
-import CanvaSocket from "./socket";
 
 // Small inline icons to avoid extra dependencies and ensure consistent look on dark background
 const ToolIcon = ({ name, size = 14 }: { name: string; size?: number }) => {
@@ -603,19 +602,6 @@ export default function ImageViewer(props: ImageViewerProps) {
                         Polygone
                     </Button>
 
-                    <Button
-                        danger
-                        type="text"
-                        size="small"
-                        icon={<ToolIcon name="erase" />}
-                        onClick={() => {
-                            canvaRef.current?.clear();
-                            setActiveTool('pan');
-                        }}
-                        style={{ color: '#FF6B6B', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
-                    >
-                        Effacer
-                    </Button>
                 </div>
             </div>
 
@@ -637,9 +623,8 @@ export default function ImageViewer(props: ImageViewerProps) {
                 style={{ display: "block", width: "100%", height: "100%" }} 
             />
 
-            {/* <Canva */}
-            <CanvaSocket
-                canvaRef={canvaRef}
+            <Canva
+                ref={canvaRef}
                 viewState={viewState}
                 width={canvasSize.w}
                 height={canvasSize.h}
