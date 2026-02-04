@@ -9,6 +9,11 @@ import {
 } from "./shapes";
 import type { Point } from "./shapes";
 
+export interface CursorBoundingBox {
+    width: number;
+    height: number;
+}
+
 export type CursorType = "pensil" | "line" | "circle" | "ellipse" | "rectangle" | "polygon";
 
 export abstract class DrawingCursor {
@@ -31,15 +36,15 @@ export abstract class DrawingCursor {
         return null;
     }
 
-    release(_point: Point): void {}
+    release(_point: Point, _bounds?: CursorBoundingBox): void {}
 
     getType(): CursorType {
         return this.type;
     }
 
-    press(_point: Point): void {}
+    press(_point: Point, _bounds?: CursorBoundingBox): void {}
 
-    move(_point: Point): void {}
+    move(_point: Point, _bounds?: CursorBoundingBox): void {}
 }
 
 export class LineCursor extends DrawingCursor {
@@ -54,7 +59,7 @@ export class LineCursor extends DrawingCursor {
         return this.start !== null && this.end !== null;
     }
 
-    press(point: Point): void {
+    press(point: Point, _bounds?: CursorBoundingBox): void {
         if (this.start === null) {
             this.start = point;
         } else {
@@ -62,7 +67,7 @@ export class LineCursor extends DrawingCursor {
         }
     }
 
-    move(point: Point): void {
+    move(point: Point, _bounds?: CursorBoundingBox): void {
         if (this.start !== null) {
             this.end = point;
         }
@@ -75,7 +80,7 @@ export class LineCursor extends DrawingCursor {
         return null;
     }
 
-    release(point: Point): void {
+    release(point: Point, _bounds?: CursorBoundingBox): void {
         if (this.start === null) return;
         if (this.end === null) this.end = point;
     }
@@ -102,7 +107,7 @@ export class PensilCursor extends DrawingCursor {
         return this.points.length >= 2;
     }
 
-    press(point: Point): void {
+    press(point: Point, _bounds?: CursorBoundingBox): void {
         if (this.points.length === 0) {
             this.points.push(point);
         } else {
@@ -110,7 +115,7 @@ export class PensilCursor extends DrawingCursor {
         }
     }
 
-    move(point: Point): void {
+    move(point: Point, _bounds?: CursorBoundingBox): void {
         if (this.points.length > 0) {
             this.points.push(point);
         }
@@ -143,17 +148,37 @@ export class CircleCursor extends DrawingCursor {
         return this.center !== null && this.radius !== null && this.radius > 0;
     }
 
-    press(point: Point): void {
+    press(point: Point, bounds?: CursorBoundingBox): void {
         if (this.center === null) {
             this.center = point;
         } else {
-            this.radius = Math.hypot(point.x - this.center.x, point.y - this.center.y);
+            let radius = Math.hypot(point.x - this.center.x, point.y - this.center.y);
+            
+            // Constrain radius so circle stays within image bounds
+            if (bounds) {
+                const maxRadiusX = Math.min(this.center.x, bounds.width - this.center.x);
+                const maxRadiusY = Math.min(this.center.y, bounds.height - this.center.y);
+                const maxRadius = Math.min(maxRadiusX, maxRadiusY);
+                radius = Math.min(radius, maxRadius);
+            }
+            
+            this.radius = radius;
         }
     }
 
-    move(point: Point): void {
+    move(point: Point, bounds?: CursorBoundingBox): void {
         if (this.center !== null) {
-            this.radius = Math.hypot(point.x - this.center.x, point.y - this.center.y);
+            let radius = Math.hypot(point.x - this.center.x, point.y - this.center.y);
+            
+            // Constrain radius so circle stays within image bounds
+            if (bounds) {
+                const maxRadiusX = Math.min(this.center.x, bounds.width - this.center.x);
+                const maxRadiusY = Math.min(this.center.y, bounds.height - this.center.y);
+                const maxRadius = Math.min(maxRadiusX, maxRadiusY);
+                radius = Math.min(radius, maxRadius);
+            }
+            
+            this.radius = radius;
         }
     }
 
@@ -164,9 +189,21 @@ export class CircleCursor extends DrawingCursor {
         return null;
     }
 
-    release(point: Point): void {
+    release(point: Point, bounds?: CursorBoundingBox): void {
         if (this.center === null) return;
-        if (this.radius === null) this.radius = Math.hypot(point.x - this.center.x, point.y - this.center.y);
+        if (this.radius === null) {
+            let radius = Math.hypot(point.x - this.center.x, point.y - this.center.y);
+            
+            // Constrain radius so circle stays within image bounds
+            if (bounds) {
+                const maxRadiusX = Math.min(this.center.x, bounds.width - this.center.x);
+                const maxRadiusY = Math.min(this.center.y, bounds.height - this.center.y);
+                const maxRadius = Math.min(maxRadiusX, maxRadiusY);
+                radius = Math.min(radius, maxRadius);
+            }
+            
+            this.radius = radius;
+        }
     }
 
     finish(): Shape | null {
@@ -198,19 +235,37 @@ export class EllipseCursor extends DrawingCursor {
         );
     }
 
-    press(point: Point): void {
+    press(point: Point, bounds?: CursorBoundingBox): void {
         if (this.center === null) {
             this.center = point;
         } else {
-            this.radiusX = Math.abs(point.x - this.center.x);
-            this.radiusY = Math.abs(point.y - this.center.y);
+            let radiusX = Math.abs(point.x - this.center.x);
+            let radiusY = Math.abs(point.y - this.center.y);
+            
+            // Constrain radii so ellipse stays within image bounds
+            if (bounds) {
+                radiusX = Math.min(radiusX, Math.min(this.center.x, bounds.width - this.center.x));
+                radiusY = Math.min(radiusY, Math.min(this.center.y, bounds.height - this.center.y));
+            }
+            
+            this.radiusX = radiusX;
+            this.radiusY = radiusY;
         }
     }
 
-    move(point: Point): void {
+    move(point: Point, bounds?: CursorBoundingBox): void {
         if (this.center !== null) {
-            this.radiusX = Math.abs(point.x - this.center.x);
-            this.radiusY = Math.abs(point.y - this.center.y);
+            let radiusX = Math.abs(point.x - this.center.x);
+            let radiusY = Math.abs(point.y - this.center.y);
+            
+            // Constrain radii so ellipse stays within image bounds
+            if (bounds) {
+                radiusX = Math.min(radiusX, Math.min(this.center.x, bounds.width - this.center.x));
+                radiusY = Math.min(radiusY, Math.min(this.center.y, bounds.height - this.center.y));
+            }
+            
+            this.radiusX = radiusX;
+            this.radiusY = radiusY;
         }
     }
 
@@ -221,10 +276,21 @@ export class EllipseCursor extends DrawingCursor {
         return null;
     }
 
-    release(point: Point): void {
+    release(point: Point, bounds?: CursorBoundingBox): void {
         if (this.center === null) return;
-        if (this.radiusX === null) this.radiusX = Math.abs(point.x - this.center.x);
-        if (this.radiusY === null) this.radiusY = Math.abs(point.y - this.center.y);
+        if (this.radiusX === null) {
+            let radiusX = Math.abs(point.x - this.center.x);
+            let radiusY = Math.abs(point.y - this.center.y);
+            
+            // Constrain radii so ellipse stays within image bounds
+            if (bounds) {
+                radiusX = Math.min(radiusX, Math.min(this.center.x, bounds.width - this.center.x));
+                radiusY = Math.min(radiusY, Math.min(this.center.y, bounds.height - this.center.y));
+            }
+            
+            this.radiusX = radiusX;
+            this.radiusY = radiusY;
+        }
     }
 
     finish(): Shape | null {
@@ -257,19 +323,47 @@ export class RectangleCursor extends DrawingCursor {
         );
     }
 
-    press(point: Point): void {
+    press(point: Point, bounds?: CursorBoundingBox): void {
         if (this.origin === null) {
             this.origin = point;
         } else {
-            this.width = point.x - this.origin.x;
-            this.height = point.y - this.origin.y;
+            let width = point.x - this.origin.x;
+            let height = point.y - this.origin.y;
+            
+            // Constrain width and height so rectangle stays within image bounds
+            if (bounds) {
+                const maxX = bounds.width - this.origin.x;
+                const minX = -this.origin.x;
+                const maxY = bounds.height - this.origin.y;
+                const minY = -this.origin.y;
+                
+                width = Math.max(minX, Math.min(maxX, width));
+                height = Math.max(minY, Math.min(maxY, height));
+            }
+            
+            this.width = width;
+            this.height = height;
         }
     }
 
-    move(point: Point): void {
+    move(point: Point, bounds?: CursorBoundingBox): void {
         if (this.origin !== null) {
-            this.width = point.x - this.origin.x;
-            this.height = point.y - this.origin.y;
+            let width = point.x - this.origin.x;
+            let height = point.y - this.origin.y;
+            
+            // Constrain width and height so rectangle stays within image bounds
+            if (bounds) {
+                const maxX = bounds.width - this.origin.x;
+                const minX = -this.origin.x;
+                const maxY = bounds.height - this.origin.y;
+                const minY = -this.origin.y;
+                
+                width = Math.max(minX, Math.min(maxX, width));
+                height = Math.max(minY, Math.min(maxY, height));
+            }
+            
+            this.width = width;
+            this.height = height;
         }
     }
 
@@ -282,10 +376,26 @@ export class RectangleCursor extends DrawingCursor {
         return null;
     }
 
-    release(point: Point): void {
+    release(point: Point, bounds?: CursorBoundingBox): void {
         if (this.origin === null) return;
-        if (this.width === null) this.width = point.x - this.origin.x;
-        if (this.height === null) this.height = point.y - this.origin.y;
+        if (this.width === null) {
+            let width = point.x - this.origin.x;
+            let height = point.y - this.origin.y;
+            
+            // Constrain width and height so rectangle stays within image bounds
+            if (bounds) {
+                const maxX = bounds.width - this.origin.x;
+                const minX = -this.origin.x;
+                const maxY = bounds.height - this.origin.y;
+                const minY = -this.origin.y;
+                
+                width = Math.max(minX, Math.min(maxX, width));
+                height = Math.max(minY, Math.min(maxY, height));
+            }
+            
+            this.width = width;
+            this.height = height;
+        }
     }
 
     finish(): Shape | null {
@@ -314,7 +424,7 @@ export class PolygonCursor extends DrawingCursor {
         return this.points.length >= 2;
     }
 
-    press(point: Point): void {
+    press(point: Point, _bounds?: CursorBoundingBox): void {
         if (this.points.length === 0) {
             this.points.push(point);
             this.points.push(point);
@@ -324,7 +434,7 @@ export class PolygonCursor extends DrawingCursor {
         }
     }
 
-    move(point: Point): void {
+    move(point: Point, _bounds?: CursorBoundingBox): void {
         if (this.points.length > 0) {
             this.points[this.points.length - 1] = point;
         }
@@ -337,7 +447,7 @@ export class PolygonCursor extends DrawingCursor {
         return null;
     }
 
-    release(point: Point): void {
+    release(point: Point, _bounds?: CursorBoundingBox): void {
         if (this.points.length > 3) {
             const first = this.points[0];
             const last = point;

@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from uuid import uuid4
 import time
+import shutil
+import zipfile
 
 from fastapi import UploadFile, File, Form, HTTPException
 from fastapi.responses import Response
@@ -47,6 +49,8 @@ class ViewerController(Controller):
 
         if kind is None:
             detected = detect_format_from_path(Path(filename))
+            if detected is None and filename.lower().endswith(".zip"):
+                detected = "DEEPZOOM"
             print(f"Detected image format: {detected}")
             if detected is None:
                 raise HTTPException(status_code=400, detail="Could not detect image format from filename. Please specify 'kind' explicitly.")
@@ -56,12 +60,32 @@ class ViewerController(Controller):
         temp_path = Path(f"/tmp/{uuid4().hex}_{filename}")
         content = await file.read()
         temp_path.write_bytes(content)
+        extracted_dir: Path | None = None
+        source_path = temp_path
 
         try:
+            if kind == "DEEPZOOM":
+                suffix = temp_path.suffix.lower()
+                if suffix == ".zip":
+                    extracted_dir = Path(f"/tmp/{uuid4().hex}_dzi")
+                    extracted_dir.mkdir(parents=True, exist_ok=True)
+                    with zipfile.ZipFile(temp_path, "r") as zf:
+                        zf.extractall(extracted_dir)
+                    dzi_candidates = list(extracted_dir.rglob("*.dzi"))
+                    if not dzi_candidates:
+                        raise ValueError("Archive .zip sans fichier .dzi")
+                    source_path = dzi_candidates[0]
+                elif suffix == ".dzi":
+                    tiles_dir = temp_path.parent / f"{temp_path.stem}_files"
+                    if not tiles_dir.exists():
+                        raise ValueError(
+                            "DZI sans tuiles. Uploadez un .zip contenant .dzi + _files."
+                        )
+
             # Register and upload levels to S3
             print(f"Uploading image {filename} as kind {kind}...")
             started = time.perf_counter()
-            record = self.registry.register_and_upload_levels(kind, temp_path, debug=True)
+            record = self.registry.register_and_upload_levels(kind, source_path, debug=True)
             elapsed = time.perf_counter() - started
             print(f"Image {filename} uploaded with id {record.id} in {elapsed:.2f}s")
 
@@ -76,10 +100,14 @@ class ViewerController(Controller):
                 "levelUrlTemplate": f"/viewer/images/{record.id}/level/{{level}}.webp",
             }
         except ValueError as e:
+            import traceback
+            traceback.print_exc()
             raise HTTPException(status_code=400, detail=str(e))
         finally:
             # Clean up temp file
             temp_path.unlink(missing_ok=True)
+            if extracted_dir:
+                shutil.rmtree(extracted_dir, ignore_errors=True)
 
     def get_info(self, image_id: str):
         record = self._get_record(image_id)
@@ -98,7 +126,7 @@ class ViewerController(Controller):
         dzi = (
             f"<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
             f"<Image xmlns=\"http://schemas.microsoft.com/deepzoom/2008\" "
-            f"Format=\"webp\" Overlap=\"0\" TileSize=\"256\">"  # Assuming tile size 256 for DZI compatibility
+            f"Format=\"webp\" Overlap=\"0\" TileSize=\"{record.tile_size}\">"
             f"<Size Width=\"{record.width}\" Height=\"{record.height}\"/>"
             f"</Image>"
         )

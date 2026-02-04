@@ -9,7 +9,7 @@ import {
     PolygonCursor,
     RectangleCursor,
 } from "../../types/viewer/cursors";
-import type { CursorType } from "../../types/viewer/cursors";
+import type { CursorBoundingBox, CursorType } from "../../types/viewer/cursors";
 import { Shape } from "../../types/viewer/shapes";
 import type { Point } from "../../types/viewer/shapes";
 
@@ -21,7 +21,7 @@ export interface CanvaViewState {
     zoom: number;
 }
 
-interface CanvaProps {
+export type CanvaProps = {
     viewState: CanvaViewState;
     width: number;
     height: number;
@@ -61,6 +61,8 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     const [previewShape, setPreviewShape] = useState<Shape | null>(null);
     const [isDrawing, setIsDrawing] = useState(false);
 
+    const bounds: CursorBoundingBox | undefined = (imageWidth && imageHeight) ? { width: imageWidth, height: imageHeight } : undefined;
+
     const viewStateRef = useRef(viewState);
     useEffect(() => {
         viewStateRef.current = viewState;
@@ -98,7 +100,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         setPreviewShape(null);
         setIsDrawing(false);
         onDrawingActiveChange?.(false);
-    }, [resolvedTool, strokeColor, strokeWidth]);
+    }, [resolvedTool, strokeColor, strokeWidth, imageWidth, imageHeight]);
 
     const addShape = (shape: Shape) => {
         setShapes((prev) => [...prev, shape]);
@@ -159,7 +161,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         if (!isPointInImage(point)) return;
 
         (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
-        cursorRef.current.press(point);
+        cursorRef.current.press(point, bounds);
         setPreviewShape(cursorRef.current.createPreview());
         setIsDrawing(true);
         onDrawingActiveChange?.(true);
@@ -180,7 +182,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         const point = toImagePoint(e);
         // Keep drawing but clamp movements to image bounds so we never draw outside
         const clamped = clampPointToImage(point);
-        cursorRef.current.move(clamped);
+        cursorRef.current.move(clamped, bounds);
         setPreviewShape(cursorRef.current.createPreview());
     };
 
@@ -188,7 +190,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         if (!isDrawing || !cursorRef.current) return;
         const point = toImagePoint(e);
         const clamped = clampPointToImage(point);
-        cursorRef.current.release(clamped);
+        cursorRef.current.release(clamped, bounds);
         commitShapeIfReady();
         onDrawingActiveChange?.(false);
         try {

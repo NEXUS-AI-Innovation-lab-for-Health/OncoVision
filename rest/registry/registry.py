@@ -12,6 +12,7 @@ from openslide.lowlevel import OpenSlideUnsupportedFormatError
 from database.s3.connection import S3Connection
 from utils.image import (
     ImageFormat,
+    DeepZoomImage,
     MedicalImage,
     OpenSlideImage,
     PillowImage,
@@ -31,6 +32,7 @@ class ImageRecord:
     width: int
     height: int
     tile_size: int = 256
+    tiles_prefix: str | None = None
 
 class ImageRegistry:
 
@@ -55,6 +57,22 @@ class ImageRegistry:
         source_key = f"{image_id}/source{source_suffix}"
         self.fs.put(str(image_path), f"{self.bucket}/{source_key}")
 
+        tiles_prefix = None
+        if kind == "DEEPZOOM":
+            tiles_dir = image_path.parent / f"{image_path.stem}_files"
+            if not tiles_dir.exists() or not tiles_dir.is_dir():
+                raise ValueError(
+                    "DZI sans tuiles. Fournissez le dossier '<nom>_files' "
+                    "ou uploadez une archive .zip contenant .dzi + _files."
+                )
+            tiles_prefix = f"{image_id}/tiles"
+            for tile_path in tiles_dir.rglob("*"):
+                if not tile_path.is_file():
+                    continue
+                rel_path = tile_path.relative_to(tiles_dir).as_posix()
+                remote_key = f"{self.bucket}/{tiles_prefix}/{rel_path}"
+                self.fs.put(str(tile_path), remote_key)
+
         record = ImageRecord(
             id=image_id,
             kind=kind,
@@ -64,6 +82,7 @@ class ImageRegistry:
             width=info.width,
             height=info.height,
             tile_size=info.tile_size,
+            tiles_prefix=tiles_prefix,
         )
         self._records[image_id] = record
 
@@ -145,10 +164,28 @@ class ImageRegistry:
         source_suffix = Path(record.source_key).suffix
         local_path = Path(f"/tmp/{record.id}{source_suffix}")
         if local_path.exists():
-            return local_path
+            if record.kind != "DEEPZOOM" or not record.tiles_prefix:
+                return local_path
+            local_tiles_dir = Path(f"/tmp/{record.id}_files")
+            if local_tiles_dir.exists() and any(local_tiles_dir.rglob("*")):
+                return local_path
 
         with self.fs.open(f"{record.bucket}/{record.source_key}", "rb") as src, open(local_path, "wb") as dst:
             shutil.copyfileobj(src, dst)
+
+        if record.kind == "DEEPZOOM" and record.tiles_prefix:
+            local_tiles_dir = Path(f"/tmp/{record.id}_files")
+            if not local_tiles_dir.exists():
+                local_tiles_dir.mkdir(parents=True, exist_ok=True)
+                remote_prefix = f"{record.bucket}/{record.tiles_prefix}"
+                for remote_path in self.fs.find(remote_prefix):
+                    if remote_path.endswith("/"):
+                        continue
+                    rel_path = remote_path[len(remote_prefix) + 1 :]
+                    local_tile_path = local_tiles_dir / rel_path
+                    local_tile_path.parent.mkdir(parents=True, exist_ok=True)
+                    with self.fs.open(remote_path, "rb") as src, open(local_tile_path, "wb") as dst:
+                        shutil.copyfileobj(src, dst)
         return local_path
 
     def _open_image(self, kind: ImageFormat, path: Path) -> MedicalImage:
@@ -170,4 +207,6 @@ class ImageRegistry:
         if kind == "TIFF":
             pillow = load_tiff_as_pillow(path)
             return PillowImage(pillow)
+        if kind == "DEEPZOOM":
+            return DeepZoomImage(path)
         raise ValueError(f"Unsupported kind: {kind}")
