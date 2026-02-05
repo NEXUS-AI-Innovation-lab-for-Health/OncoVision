@@ -6,4 +6,7 @@ class Controller(APIRouter):
         super().__init__(prefix=f"/{path}", tags=[path])
 
     def add_api_websocket_route(self, path, endpoint, name = None, *, dependencies = None):
-        return super().add_api_websocket_route(f"/{path}", endpoint, name, dependencies=dependencies)
+        # Use add_websocket_route (non-API version) to avoid WebSocket handshake issues
+        # The add_api_websocket_route method can cause 403 errors
+        full_path = f"/{path}"
+        return super().add_websocket_route(full_path, endpoint, name)
