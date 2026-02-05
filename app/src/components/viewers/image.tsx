@@ -587,16 +587,16 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
             {isToolbarMinimized && (
                 <div style={{
                     position: 'absolute',
-                    left: isMobile ? 8 : 16,
-                    top: isMobile ? 8 : 16,
+                    left: isMobile ? 6 : 12,
+                    top: isMobile ? 6 : 12,
                     zIndex: 300,
                 }} onMouseDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
                     <Tooltip title="Afficher la barre d'outils" placement="right">
                         <Button
                             type="text"
                             shape="circle"
-                            size={isMobile ? "small" : "middle"}
-                            icon={<FiChevronRight size={isMobile ? 14 : 16} />}
+                            size="small"
+                            icon={<FiChevronRight size={isMobile ? 12 : 13} />}
                             onClick={() => setIsToolbarMinimized(false)}
                             style={{ 
                                 color: '#E9EEF5', 
@@ -613,34 +613,34 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
             {!isToolbarMinimized && (
             <div style={{
                 position: 'absolute',
-                left: isMobile ? 8 : 16,
-                top: isMobile ? 8 : 16,
+                left: isMobile ? 6 : 12,
+                top: isMobile ? 6 : 12,
                 zIndex: 300,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: isMobile ? 6 : 10,
-                padding: isMobile ? '8px' : '12px',
+                gap: isMobile ? 4 : 6,
+                padding: isMobile ? '6px' : '8px',
                 background: 'linear-gradient(180deg, rgba(20,22,25,0.95), rgba(14,15,17,0.9))',
-                borderRadius: isMobile ? 8 : 12,
+                borderRadius: isMobile ? 6 : 8,
                 backdropFilter: 'blur(10px)',
                 border: '1px solid rgba(255,255,255,0.08)',
                 boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
                 color: '#E9EEF5',
-                width: isMobile ? 100 : 120
+                width: isMobile ? 70 : 80
             }} onMouseDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
                 {/* Minimize button at top */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: isMobile ? 4 : 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: isMobile ? 2 : 4 }}>
                     <Tooltip title="Masquer la barre d'outils" placement="right">
                         <Button
                             type="text"
                             size="small"
-                            icon={<FiChevronLeft size={12} />}
+                            icon={<FiChevronLeft size={10} />}
                             onClick={() => setIsToolbarMinimized(true)}
                             style={{ 
                                 color: '#E9EEF5', 
                                 background: 'transparent',
                                 border: 'none',
-                                padding: '2px',
+                                padding: '1px',
                                 height: 'auto',
                                 minHeight: 'auto'
                             }}
@@ -648,18 +648,18 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                     </Tooltip>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 6 : 8, alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 4 : 5, alignItems: 'center' }}>
                     <Tooltip title="Zoom +" placement="right">
                         <Button
                             type="text"
                             shape="circle"
-                            size={isMobile ? "small" : "middle"}
-                            icon={<FiZoomIn size={isMobile ? 14 : 16} />}
+                            size="small"
+                            icon={<FiZoomIn size={isMobile ? 12 : 13} />}
                             onClick={() => zoomBy(1.25)}
                             style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
                         />
                     </Tooltip>
-                    <div style={{ height: isMobile ? 80 : 110, padding: '6px 0' }}>
+                    <div style={{ height: isMobile ? 60 : 70, padding: '4px 0' }}>
                         <Slider
                             vertical
                             min={0.01}
@@ -677,19 +677,19 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                         <Button
                             type="text"
                             shape="circle"
-                            size={isMobile ? "small" : "middle"}
-                            icon={<FiZoomOut size={isMobile ? 14 : 16} />}
+                            size="small"
+                            icon={<FiZoomOut size={isMobile ? 12 : 13} />}
                             onClick={() => zoomBy(1 / 1.25)}
                             style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
                         />
                     </Tooltip>
-                    <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.06)', margin: isMobile ? '4px 0' : '6px 0' }} />
+                    <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.06)', margin: isMobile ? '2px 0' : '3px 0' }} />
                     <Tooltip title="Ajuster à l'écran" placement="right">
                         <Button
                             type="text"
                             shape="circle"
-                            size={isMobile ? "small" : "middle"}
-                            icon={<FiMaximize2 size={isMobile ? 14 : 16} />}
+                            size="small"
+                            icon={<FiMaximize2 size={isMobile ? 12 : 13} />}
                             onClick={fitToScreen}
                             style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
                         />
@@ -698,43 +698,43 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                         <Button
                             type="text"
                             shape="circle"
-                            size={isMobile ? "small" : "middle"}
-                            icon={isFullscreen ? <FiMinimize2 size={isMobile ? 14 : 16} /> : <FiMaximize2 size={isMobile ? 14 : 16} />}
+                            size="small"
+                            icon={isFullscreen ? <FiMinimize2 size={isMobile ? 12 : 13} /> : <FiMaximize2 size={isMobile ? 12 : 13} />}
                             onClick={toggleFullscreen}
                             style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
                         />
                     </Tooltip>
                 </div>
 
-                <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.06)', margin: isMobile ? '6px 0' : '8px 0' }} />
+                <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.06)', margin: isMobile ? '4px 0' : '5px 0' }} />
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 6 : 8 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 4 : 5 }}>
                     <Button
                         type={activeTool === 'pan' ? 'primary' : 'text'}
                         size="small"
-                        icon={<ToolIcon name="pan" size={isMobile ? 12 : 14} />}
+                        icon={<ToolIcon name="pan" size={isMobile ? 10 : 11} />}
                         onClick={() => setActiveTool('pan')}
                         style={activeTool === 'pan' ? { 
                             background: '#1366FF', 
                             color: '#FFF', 
-                            borderRadius: 8, 
+                            borderRadius: 6, 
                             display: 'flex', 
-                            gap: isMobile ? 4 : 8, 
+                            gap: isMobile ? 3 : 4, 
                             alignItems: 'center', 
                             justifyContent: 'flex-start', 
-                            padding: isMobile ? '4px 8px' : '6px 10px',
-                            fontSize: isMobile ? 11 : 13
+                            padding: isMobile ? '3px 6px' : '4px 6px',
+                            fontSize: isMobile ? 10 : 11
                         } : { 
                             color: '#E9EEF5', 
                             background: 'transparent', 
                             border: '1px solid rgba(255,255,255,0.02)', 
-                            borderRadius: 8, 
+                            borderRadius: 6, 
                             display: 'flex', 
-                            gap: isMobile ? 4 : 8, 
+                            gap: isMobile ? 3 : 4, 
                             alignItems: 'center', 
                             justifyContent: 'flex-start', 
-                            padding: isMobile ? '4px 8px' : '6px 10px',
-                            fontSize: isMobile ? 11 : 13
+                            padding: isMobile ? '3px 6px' : '4px 6px',
+                            fontSize: isMobile ? 10 : 11
                         }}
                     >
                         Pan
@@ -745,9 +745,9 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                     <Button
                         type={activeTool === 'pensil' ? 'primary' : 'text'}
                         size="small"
-                        icon={<ToolIcon name="pensil" />}
+                        icon={<ToolIcon name="pensil" size={11} />}
                         onClick={() => setActiveTool('pensil')}
-                        style={activeTool === 'pensil' ? { background: '#1366FF', color: '#FFF', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
+                        style={activeTool === 'pensil' ? { background: '#1366FF', color: '#FFF', borderRadius: 6, display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'flex-start', padding: '4px 6px', fontSize: 11 } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 6, display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'flex-start', padding: '4px 6px', fontSize: 11 }}
                     >
                         Crayon
                     </Button>
@@ -755,9 +755,9 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                     <Button
                         type={activeTool === 'line' ? 'primary' : 'text'}
                         size="small"
-                        icon={<ToolIcon name="line" />}
+                        icon={<ToolIcon name="line" size={11} />}
                         onClick={() => setActiveTool('line')}
-                        style={activeTool === 'line' ? { background: '#1366FF', color: '#FFF', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
+                        style={activeTool === 'line' ? { background: '#1366FF', color: '#FFF', borderRadius: 6, display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'flex-start', padding: '4px 6px', fontSize: 11 } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 6, display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'flex-start', padding: '4px 6px', fontSize: 11 }}
                     >
                         Ligne
                     </Button>
@@ -765,9 +765,9 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                     <Button
                         type={activeTool === 'rectangle' ? 'primary' : 'text'}
                         size="small"
-                        icon={<ToolIcon name="rectangle" />}
+                        icon={<ToolIcon name="rectangle" size={11} />}
                         onClick={() => setActiveTool('rectangle')}
-                        style={activeTool === 'rectangle' ? { background: '#1366FF', color: '#FFF', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
+                        style={activeTool === 'rectangle' ? { background: '#1366FF', color: '#FFF', borderRadius: 6, display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'flex-start', padding: '4px 6px', fontSize: 11 } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 6, display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'flex-start', padding: '4px 6px', fontSize: 11 }}
                     >
                         Rectangle
                     </Button>
@@ -775,9 +775,9 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                     <Button
                         type={activeTool === 'circle' ? 'primary' : 'text'}
                         size="small"
-                        icon={<ToolIcon name="circle" />}
+                        icon={<ToolIcon name="circle" size={11} />}
                         onClick={() => setActiveTool('circle')}
-                        style={activeTool === 'circle' ? { background: '#1366FF', color: '#FFF', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
+                        style={activeTool === 'circle' ? { background: '#1366FF', color: '#FFF', borderRadius: 6, display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'flex-start', padding: '4px 6px', fontSize: 11 } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 6, display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'flex-start', padding: '4px 6px', fontSize: 11 }}
                     >
                         Cercle
                     </Button>
@@ -785,9 +785,9 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                     <Button
                         type={activeTool === 'ellipse' ? 'primary' : 'text'}
                         size="small"
-                        icon={<ToolIcon name="ellipse" />}
+                        icon={<ToolIcon name="ellipse" size={11} />}
                         onClick={() => setActiveTool('ellipse')}
-                        style={activeTool === 'ellipse' ? { background: '#1366FF', color: '#FFF', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
+                        style={activeTool === 'ellipse' ? { background: '#1366FF', color: '#FFF', borderRadius: 6, display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'flex-start', padding: '4px 6px', fontSize: 11 } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 6, display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'flex-start', padding: '4px 6px', fontSize: 11 }}
                     >
                         Ellipse
                     </Button>
@@ -795,9 +795,9 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                     <Button
                         type={activeTool === 'polygon' ? 'primary' : 'text'}
                         size="small"
-                        icon={<ToolIcon name="polygon" />}
+                        icon={<ToolIcon name="polygon" size={11} />}
                         onClick={() => setActiveTool('polygon')}
-                        style={activeTool === 'polygon' ? { background: '#1366FF', color: '#FFF', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
+                        style={activeTool === 'polygon' ? { background: '#1366FF', color: '#FFF', borderRadius: 6, display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'flex-start', padding: '4px 6px', fontSize: 11 } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 6, display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'flex-start', padding: '4px 6px', fontSize: 11 }}
                     >
                         Polygone
                     </Button>
@@ -806,12 +806,12 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                         danger
                         type="text"
                         size="small"
-                        icon={<ToolIcon name="erase" />}
+                        icon={<ToolIcon name="erase" size={11} />}
                         onClick={() => {
                             canvaRef.current?.clear();
                             setActiveTool('pan');
                         }}
-                        style={{ color: '#FF6B6B', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
+                        style={{ color: '#FF6B6B', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 6, display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'flex-start', padding: '4px 6px', fontSize: 11 }}
                     >
                         Effacer
                     </Button>
