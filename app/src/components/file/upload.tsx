@@ -1,6 +1,5 @@
 import { Button, Input, Divider } from "antd";
 import { useEffect, useState } from "react";
-import { FaUpload } from "react-icons/fa";
 import { useRest } from "../../hooks/rest";
 import ImageViewer from "../viewers/image";
 import { PatientSelector } from "../PatientSelector";
@@ -77,13 +76,6 @@ export default function ImageUploader() {
             />
             {!file ? (
                 <div>
-                    <p className="ant-upload-drag-icon">
-                        <FaUpload />
-                    </p>
-                    <p className="ant-upload-text">Select a file to upload</p>
-                    <p className="ant-upload-hint">
-                        Support for .tiff, .dicom, .svs, .dzi files.
-                    </p>
                 </div>
             ) : (
                 <div>
