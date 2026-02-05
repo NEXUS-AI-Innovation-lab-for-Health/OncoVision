@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Slider, Button, Tooltip } from "antd";
-import { FiZoomIn, FiZoomOut, FiMaximize2 } from "react-icons/fi";
+import { FiZoomIn, FiZoomOut, FiMaximize2, FiMinimize2, FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { useRest } from "../../hooks/rest";
 import ImagePreview from "./preview"; // New import
 import Canva from "./canva";
@@ -96,6 +96,8 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
     const [canvasSize, setCanvasSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
     const [activeTool, setActiveTool] = useState<CanvaTool>("pan");
     const [isMobile, setIsMobile] = useState(false);
+    const [isToolbarMinimized, setIsToolbarMinimized] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
     
     // Touch support refs
     const lastTouchDistance = useRef<number | null>(null);
@@ -436,7 +438,13 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
 
     const handleTouchMove = (e: React.TouchEvent) => {
         if (isDrawingActive) return;
-        e.preventDefault(); // Prevent scrolling
+        
+        // Prevent default only if possible (avoid passive event listener error)
+        try {
+            e.preventDefault();
+        } catch (err) {
+            // Ignore passive event listener error
+        }
         
         if (e.touches.length === 1 && isDragging && lastMousePos.current) {
             // Single touch pan
@@ -497,6 +505,32 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
         animateTo({ x: info.width / 2, y: info.height / 2, zoom: initialZoom });
     };
 
+    const toggleFullscreen = async () => {
+        if (!containerRef.current) return;
+        
+        try {
+            if (!document.fullscreenElement) {
+                await containerRef.current.requestFullscreen();
+                setIsFullscreen(true);
+            } else {
+                await document.exitFullscreen();
+                setIsFullscreen(false);
+            }
+        } catch (err) {
+            console.error('Fullscreen error:', err);
+        }
+    };
+
+    // Listen for fullscreen changes
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullscreen(!!document.fullscreenElement);
+        };
+        
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
+
     // Redraw when state changes
     useEffect(() => {
         requestAnimationFrame(draw);
@@ -549,6 +583,34 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
         >
+            {/* Minimized toolbar - just toggle button */}
+            {isToolbarMinimized && (
+                <div style={{
+                    position: 'absolute',
+                    left: isMobile ? 8 : 16,
+                    top: isMobile ? 8 : 16,
+                    zIndex: 300,
+                }} onMouseDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
+                    <Tooltip title="Afficher la barre d'outils" placement="right">
+                        <Button
+                            type="text"
+                            shape="circle"
+                            size={isMobile ? "small" : "middle"}
+                            icon={<FiChevronRight size={isMobile ? 14 : 16} />}
+                            onClick={() => setIsToolbarMinimized(false)}
+                            style={{ 
+                                color: '#E9EEF5', 
+                                background: 'rgba(20,22,25,0.95)',
+                                border: '1px solid rgba(255,255,255,0.08)',
+                                backdropFilter: 'blur(10px)'
+                            }}
+                        />
+                    </Tooltip>
+                </div>
+            )}
+
+            {/* Full toolbar */}
+            {!isToolbarMinimized && (
             <div style={{
                 position: 'absolute',
                 left: isMobile ? 8 : 16,
@@ -566,6 +628,26 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                 color: '#E9EEF5',
                 width: isMobile ? 100 : 120
             }} onMouseDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
+                {/* Minimize button at top */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: isMobile ? 4 : 8 }}>
+                    <Tooltip title="Masquer la barre d'outils" placement="right">
+                        <Button
+                            type="text"
+                            size="small"
+                            icon={<FiChevronLeft size={12} />}
+                            onClick={() => setIsToolbarMinimized(true)}
+                            style={{ 
+                                color: '#E9EEF5', 
+                                background: 'transparent',
+                                border: 'none',
+                                padding: '2px',
+                                height: 'auto',
+                                minHeight: 'auto'
+                            }}
+                        />
+                    </Tooltip>
+                </div>
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 6 : 8, alignItems: 'center' }}>
                     <Tooltip title="Zoom +" placement="right">
                         <Button
@@ -609,6 +691,16 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                             size={isMobile ? "small" : "middle"}
                             icon={<FiMaximize2 size={isMobile ? 14 : 16} />}
                             onClick={fitToScreen}
+                            style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
+                        />
+                    </Tooltip>
+                    <Tooltip title={isFullscreen ? "Quitter plein écran" : "Plein écran"} placement="right">
+                        <Button
+                            type="text"
+                            shape="circle"
+                            size={isMobile ? "small" : "middle"}
+                            icon={isFullscreen ? <FiMinimize2 size={isMobile ? 14 : 16} /> : <FiMaximize2 size={isMobile ? 14 : 16} />}
+                            onClick={toggleFullscreen}
                             style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
                         />
                     </Tooltip>
@@ -727,6 +819,7 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                     )}
                 </div>
             </div>
+            )}
 
             {/* Thumbnail preview */}
             <div style={{ position: 'absolute', right: isMobile ? 8 : 16, top: isMobile ? 8 : 16, zIndex: 300 }}>
