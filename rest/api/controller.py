@@ -13,7 +13,8 @@ class Controller(APIRouter):
         self._websocket_routes.append({
             'path': full_path,
             'endpoint': endpoint,
-            'name': name
+            'name': name,
+            'dependencies': dependencies
         })
         return None
     
