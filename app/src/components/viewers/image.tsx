@@ -539,7 +539,7 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                 position: "relative", 
                 overflow: "hidden", 
                 cursor: activeTool === "pan" ? "move" : "crosshair",
-                touchAction: "none" // Disable default touch actions for better control
+                touchAction: "none" // Disable default touch behaviors (pull-to-refresh, double-tap zoom) for custom gesture handling
             }}
             onMouseDown={handleMouseDown}
             onMouseUp={handleMouseUp}
