@@ -104,6 +104,9 @@ routers = [
 ]
 for router in routers:
     app.include_router(router)
+    # Register WebSocket routes directly on app (APIRouter has issues with WebSockets)
+    if hasattr(router, 'register_websockets'):
+        router.register_websockets(app)
     print(f"Router '{router.prefix}' included.")
 print(f"Total of {len(routers)} routers included.")
 print(f"Routes: {[route.path for route in app.routes]}")

@@ -11,19 +11,17 @@ export default function CanvaSocket(props: CanvaSocketProps) {
     const handleRef = useRef<CanvaHandle | null>(null);
 
     const { useWebSocket } = useRest();
-    const { connect, disconnect, setAutoConnect } = useWebSocket({
+    const { disconnect, setAutoConnect } = useWebSocket({
         url: "draw/join_draw",
+        autoConnect: true
     });
 
-    useEffect(() => {
-        
-        setAutoConnect(true);
-        connect();
-
+    useEffect(() => {        
         return () => {
+            setAutoConnect(false);
             disconnect();
         }
-    }, []);
+    }, [disconnect, setAutoConnect]);
 
     return (
         <div>

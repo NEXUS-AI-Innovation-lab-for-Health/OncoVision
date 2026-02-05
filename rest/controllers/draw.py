@@ -26,5 +26,5 @@ class DrawController(Controller, WebSocketHandler):
         self.sessions: dict[str, DrawSession] = {}
         self.add_api_websocket_route(f"join_draw", self.handle_socket)
 
-    async def on_socket_connect(self, websocket: WebSocket, **kwargs) -> None:
-        print("Socket connected, waiting for join message...", kwargs)
+    async def on_socket_connect(self, websocket: WebSocket) -> None:
+        print("Socket connected, waiting for join message...")

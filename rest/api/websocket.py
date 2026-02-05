@@ -54,21 +54,20 @@ class WebSocketHandler:
         registered = self.register_websocket_handlers()
         print(f"Registered {registered} in {self.__class__.__name__}")
 
-    async def on_socket_connect(self, websocket: WebSocket, **kwargs) -> None:
-        """Default no-op on connect handler. Subclasses may override.
-        Extra keyword arguments passed from the websocket route (e.g., path params) are forwarded here."""
+    async def on_socket_connect(self, websocket: WebSocket) -> None:
+        """Default no-op on connect handler. Subclasses may override."""
         return None
 
     async def on_socket_disconnect(self, websocket: WebSocket, error: Exception | None = None) -> bool:
         """Default on disconnect handler. Subclasses may override. Return True to stop handling."""
         return True
 
-    async def handle_socket(self, websocket: WebSocket, **kwargs) -> None:
+    async def handle_socket(self, websocket: WebSocket) -> None:
         try:
             await websocket.accept()
-            print("WebSocket accepted, calling on_socket_connect...", kwargs)
+            print("WebSocket accepted, calling on_socket_connect...")
 
-            await self.on_socket_connect(websocket, **kwargs)
+            await self.on_socket_connect(websocket)
             disconnected = False
             try:
                 while True:
