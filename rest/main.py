@@ -12,7 +12,8 @@ from database.mongo.connection import MongoConnection, MongoCredentials
 import models as _ # Load models
 
 # Import controllers
-from controllers.viewer import ViewerController
+from controllers.image import ImageController
+from controllers.draw import DrawController
 
 # Load env. variables
 dotenv.load_dotenv()
@@ -33,6 +34,16 @@ app.add_middleware(
     allow_headers=["*"],
     allow_credentials=True,
 )
+
+from fastapi import HTTPException, Request
+from starlette.responses import PlainTextResponse
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    import traceback
+    traceback.print_exc()
+    # Return a simple response to ensure the client sees status code
+    return PlainTextResponse(str(exc.detail or exc), status_code=exc.status_code)
 
 # Initialize sql database connections
 sql_credentials = SQLCredentials(
@@ -88,12 +99,14 @@ except Exception as e:
     exit(1)
 
 routers = [
-    ViewerController(s3_connection),
+    ImageController(s3_connection),
+    DrawController(),
 ]
 for router in routers:
     app.include_router(router)
     print(f"Router '{router.prefix}' included.")
 print(f"Total of {len(routers)} routers included.")
+print(f"Routes: {[route.path for route in app.routes]}")
 
 if __name__ == "__main__":
     host = os.getenv("HOST", "127.0.0.1")

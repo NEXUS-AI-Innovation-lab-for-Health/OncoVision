@@ -17,10 +17,10 @@ from utils.image import (
 )
 from database.s3.connection import S3Connection
 
-class ViewerController(Controller):
+class ImageController(Controller):
 
     def __init__(self, s3_connection: S3Connection) -> None:
-        super().__init__("viewer")
+        super().__init__("viewer") # Todo: change name?
 
         bucket = "images"  # You can make this configurable
 

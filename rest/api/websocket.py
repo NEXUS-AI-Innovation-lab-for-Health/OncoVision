@@ -21,7 +21,7 @@ class WebSocketBus:
             self.handlers[type_] = set()
         self.handlers[type_].add(fn)
 
-    async def dispatch(self, socket: WebSocket, message: dict) -> None:
+    async def dispatch(self, websocket: WebSocket, message: dict) -> None:
 
         type_ = message.get("type")
         if not type_:
@@ -38,7 +38,7 @@ class WebSocketBus:
                     continue
             else:
                 msg = payload
-            await fn(socket, msg)
+            await fn(websocket, msg)
 
 def websocket_subscribe(type_, message_class=None):
     def decorator(fn):
@@ -54,26 +54,38 @@ class WebSocketHandler:
         registered = self.register_websocket_handlers()
         print(f"Registered {registered} in {self.__class__.__name__}")
 
-    # on_connect = def on_connect(socket: WebSocket): ...
-    # on_disconnect = def on_disconnect(socket: WebSocket, error: Error | None = None): -> bool (if true: disconnect)
-    async def handle_socket(self, socket: WebSocket, on_connect: Callable | None = None, on_disconnect: Callable | None = None) -> None:
-        await socket.accept()
-        if on_connect:
-            await on_connect(socket)
-        disconnected = False
+    async def on_socket_connect(self, websocket: WebSocket, **kwargs) -> None:
+        """Default no-op on connect handler. Subclasses may override.
+        Extra keyword arguments passed from the websocket route (e.g., path params) are forwarded here."""
+        return None
+
+    async def on_socket_disconnect(self, websocket: WebSocket, error: Exception | None = None) -> bool:
+        """Default on disconnect handler. Subclasses may override. Return True to stop handling."""
+        return True
+
+    async def handle_socket(self, websocket: WebSocket, **kwargs) -> None:
+        print("handle_socket called")
         try:
-            while True:
-                data = await socket.receive_json()
-                await self.bus.dispatch(socket, data)
-        except WebSocketDisconnect as e:
-            disconnected = True
-            if on_disconnect:
-                should_disconnect = await on_disconnect(socket, e)
+            await websocket.accept()
+            print("WebSocket accepted, calling on_socket_connect...", kwargs)
+
+            await self.on_socket_connect(websocket, **kwargs)
+            disconnected = False
+            try:
+                while True:
+                    data = await websocket.receive_json()
+                    await self.bus.dispatch(websocket, data)
+            except WebSocketDisconnect as e:
+                disconnected = True
+                should_disconnect = await self.on_socket_disconnect(websocket, e)
                 if should_disconnect:
                     return
-        finally:
-            if not disconnected:
-                await socket.close()
+            finally:
+                if not disconnected:
+                    await websocket.close()
+        except Exception as e:
+            print(f"Exception in handle_socket: {e}")
+            raise
 
     def register_websocket_handlers(self) -> int:
         count = 0
