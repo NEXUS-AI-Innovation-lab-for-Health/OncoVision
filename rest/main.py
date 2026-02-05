@@ -15,6 +15,10 @@ import models as _ # Load models
 
 # Import controllers
 from controllers.viewer import ViewerController
+from controllers.patient import PatientController
+
+# Import startup utilities
+from utils.startup import auto_register_images, create_fake_patients
 
 # Load env. variables
 dotenv.load_dotenv()
@@ -85,6 +89,29 @@ def upload_image(content):
 routers = [
     ViewerController(s3_connection),
 ]
+
+# Initialize PatientController
+patient_controller = PatientController()
+routers.append(patient_controller)
+
+# Auto-register images from the images directory at startup
+images_dir = Path(__file__).parent.parent / "images"
+print(f"\n[startup] Auto-registering images from: {images_dir}")
+viewer_controller = routers[0]  # Get the ViewerController instance
+image_map = auto_register_images(viewer_controller.registry, images_dir, debug=True)
+
+if image_map:
+    print(f"\n[startup] Successfully registered {len(image_map)} images:")
+    for filename, image_id in image_map.items():
+        print(f"  - {filename} → {image_id}")
+else:
+    print(f"[startup] No images registered from {images_dir}")
+
+# Create fake patients with the registered image IDs
+patients = create_fake_patients(image_map)
+patient_controller.set_patients(patients)
+print(f"\n[startup] Created {len(patients)} patients with valid image IDs")
+
 for router in routers:
     app.include_router(router)
     print(f"Router '{router.prefix}' included.")
