@@ -75,7 +75,7 @@ export function PatientDetail() {
 
           {patient.imageId && (
             <>
-              <Divider orientation="left">Imagerie Médicale</Divider>
+              <Divider>Imagerie Médicale</Divider>
               <div style={{ width: '100%', height: '600px', border: '1px solid #d9d9d9', borderRadius: 8, overflow: 'hidden' }}>
                 <ImageViewer imageId={patient.imageId} />
               </div>
@@ -84,7 +84,7 @@ export function PatientDetail() {
 
           {!patient.imageId && (
             <>
-              <Divider orientation="left">Imagerie Médicale</Divider>
+              <Divider>Imagerie Médicale</Divider>
               <div style={{ 
                 width: '100%', 
                 height: '400px', 

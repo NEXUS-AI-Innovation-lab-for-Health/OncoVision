@@ -59,7 +59,7 @@ export function PatientList() {
     {
       title: "Action",
       key: "action",
-      render: (_: any, record: Patient) => (
+      render: (_: unknown, record: Patient) => (
         <Button type="primary" onClick={() => navigate(`/patient/${record.id}`)}>
           Voir dossier
         </Button>
