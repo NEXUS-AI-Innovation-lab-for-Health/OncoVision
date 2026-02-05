@@ -95,6 +95,20 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
     const [isDrawingActive, setIsDrawingActive] = useState(false);
     const [canvasSize, setCanvasSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
     const [activeTool, setActiveTool] = useState<CanvaTool>("pan");
+    const [isMobile, setIsMobile] = useState(false);
+    
+    // Touch support refs
+    const lastTouchDistance = useRef<number | null>(null);
+    const lastTouchCenter = useRef<{ x: number, y: number } | null>(null);
+
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth < 768);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     // 1. Fetch image info
     const { data: info, refetch } = useQuery<any>({
@@ -395,6 +409,76 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
         }));
     };
 
+    // Touch event handlers for mobile/tablet
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (isDrawingActive) return;
+        
+        if (e.touches.length === 1) {
+            // Single touch - pan
+            const touch = e.touches[0];
+            setIsDragging(true);
+            lastMousePos.current = { x: touch.clientX, y: touch.clientY };
+        } else if (e.touches.length === 2) {
+            // Two finger touch - prepare for pinch zoom
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            
+            const dx = touch2.clientX - touch1.clientX;
+            const dy = touch2.clientY - touch1.clientY;
+            lastTouchDistance.current = Math.sqrt(dx * dx + dy * dy);
+            
+            lastTouchCenter.current = {
+                x: (touch1.clientX + touch2.clientX) / 2,
+                y: (touch1.clientY + touch2.clientY) / 2
+            };
+        }
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (isDrawingActive) return;
+        e.preventDefault(); // Prevent scrolling
+        
+        if (e.touches.length === 1 && isDragging && lastMousePos.current) {
+            // Single touch pan
+            const touch = e.touches[0];
+            const dx = touch.clientX - lastMousePos.current.x;
+            const dy = touch.clientY - lastMousePos.current.y;
+            lastMousePos.current = { x: touch.clientX, y: touch.clientY };
+
+            setViewState(prev => ({
+                ...prev,
+                x: prev.x - dx / prev.zoom,
+                y: prev.y - dy / prev.zoom,
+            }));
+        } else if (e.touches.length === 2 && lastTouchDistance.current !== null) {
+            // Two finger pinch zoom
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            
+            const dx = touch2.clientX - touch1.clientX;
+            const dy = touch2.clientY - touch1.clientY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            const scale = distance / lastTouchDistance.current;
+            lastTouchDistance.current = distance;
+            
+            setViewState(prev => {
+                let newZoom = prev.zoom * scale;
+                newZoom = Math.max(0.001, Math.min(1, newZoom));
+                return { ...prev, zoom: newZoom };
+            });
+        }
+    };
+
+    const handleTouchEnd = () => {
+        if (isDrawingActive) return;
+        setIsDragging(false);
+        lastMousePos.current = null;
+        lastTouchDistance.current = null;
+        lastTouchCenter.current = null;
+        checkBounds();
+    };
+
     // Convenient zoom helpers
     const zoomBy = (factor: number) => setViewState(prev => {
         let newZoom = prev.zoom * factor;
@@ -454,42 +538,46 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                 backgroundColor: "#111", 
                 position: "relative", 
                 overflow: "hidden", 
-                cursor: activeTool === "pan" ? "move" : "crosshair" 
+                cursor: activeTool === "pan" ? "move" : "crosshair",
+                touchAction: "none" // Disable default touch actions for better control
             }}
             onMouseDown={handleMouseDown}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
             onMouseMove={handleMouseMove}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
         >
             <div style={{
                 position: 'absolute',
-                left: 16,
-                top: 16,
+                left: isMobile ? 8 : 16,
+                top: isMobile ? 8 : 16,
                 zIndex: 300,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 10,
-                padding: '12px',
+                gap: isMobile ? 6 : 10,
+                padding: isMobile ? '8px' : '12px',
                 background: 'linear-gradient(180deg, rgba(20,22,25,0.95), rgba(14,15,17,0.9))',
-                borderRadius: 12,
+                borderRadius: isMobile ? 8 : 12,
                 backdropFilter: 'blur(10px)',
                 border: '1px solid rgba(255,255,255,0.08)',
                 boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
                 color: '#E9EEF5',
-                width: 120
-            }} onMouseDown={e => e.stopPropagation()}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+                width: isMobile ? 100 : 120
+            }} onMouseDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 6 : 8, alignItems: 'center' }}>
                     <Tooltip title="Zoom +" placement="right">
                         <Button
                             type="text"
                             shape="circle"
-                            size="small"
-                            icon={<FiZoomIn size={16} />}
+                            size={isMobile ? "small" : "middle"}
+                            icon={<FiZoomIn size={isMobile ? 14 : 16} />}
                             onClick={() => zoomBy(1.25)}
                             style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
                         />
                     </Tooltip>
-                    <div style={{ height: 110, padding: '6px 0' }}>
+                    <div style={{ height: isMobile ? 80 : 110, padding: '6px 0' }}>
                         <Slider
                             vertical
                             min={0.01}
@@ -507,38 +595,61 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                         <Button
                             type="text"
                             shape="circle"
-                            size="small"
-                            icon={<FiZoomOut size={16} />}
+                            size={isMobile ? "small" : "middle"}
+                            icon={<FiZoomOut size={isMobile ? 14 : 16} />}
                             onClick={() => zoomBy(1 / 1.25)}
                             style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
                         />
                     </Tooltip>
-                    <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.06)', margin: '6px 0' }} />
+                    <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.06)', margin: isMobile ? '4px 0' : '6px 0' }} />
                     <Tooltip title="Ajuster à l'écran" placement="right">
                         <Button
                             type="text"
                             shape="circle"
-                            size="small"
-                            icon={<FiMaximize2 size={16} />}
+                            size={isMobile ? "small" : "middle"}
+                            icon={<FiMaximize2 size={isMobile ? 14 : 16} />}
                             onClick={fitToScreen}
                             style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
                         />
                     </Tooltip>
                 </div>
 
-                <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />
+                <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.06)', margin: isMobile ? '6px 0' : '8px 0' }} />
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 6 : 8 }}>
                     <Button
                         type={activeTool === 'pan' ? 'primary' : 'text'}
                         size="small"
-                        icon={<ToolIcon name="pan" />}
+                        icon={<ToolIcon name="pan" size={isMobile ? 12 : 14} />}
                         onClick={() => setActiveTool('pan')}
-                        style={activeTool === 'pan' ? { background: '#1366FF', color: '#FFF', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
+                        style={activeTool === 'pan' ? { 
+                            background: '#1366FF', 
+                            color: '#FFF', 
+                            borderRadius: 8, 
+                            display: 'flex', 
+                            gap: isMobile ? 4 : 8, 
+                            alignItems: 'center', 
+                            justifyContent: 'flex-start', 
+                            padding: isMobile ? '4px 8px' : '6px 10px',
+                            fontSize: isMobile ? 11 : 13
+                        } : { 
+                            color: '#E9EEF5', 
+                            background: 'transparent', 
+                            border: '1px solid rgba(255,255,255,0.02)', 
+                            borderRadius: 8, 
+                            display: 'flex', 
+                            gap: isMobile ? 4 : 8, 
+                            alignItems: 'center', 
+                            justifyContent: 'flex-start', 
+                            padding: isMobile ? '4px 8px' : '6px 10px',
+                            fontSize: isMobile ? 11 : 13
+                        }}
                     >
                         Pan
                     </Button>
 
+                    {!isMobile && (
+                        <>
                     <Button
                         type={activeTool === 'pensil' ? 'primary' : 'text'}
                         size="small"
@@ -612,11 +723,13 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                     >
                         Effacer
                     </Button>
+                    </>
+                    )}
                 </div>
             </div>
 
             {/* Thumbnail preview */}
-            <div style={{ position: 'absolute', right: 16, top: 16, zIndex: 300 }}>
+            <div style={{ position: 'absolute', right: isMobile ? 8 : 16, top: isMobile ? 8 : 16, zIndex: 300 }}>
                 <ImagePreview
                     info={info}
                     imageId={imageId}
