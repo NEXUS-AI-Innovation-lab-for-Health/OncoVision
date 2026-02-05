@@ -64,7 +64,6 @@ class WebSocketHandler:
         return True
 
     async def handle_socket(self, websocket: WebSocket, **kwargs) -> None:
-        print("handle_socket called")
         try:
             await websocket.accept()
             print("WebSocket accepted, calling on_socket_connect...", kwargs)

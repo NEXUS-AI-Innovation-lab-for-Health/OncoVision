@@ -29,7 +29,9 @@ export type UseWebSocketReturn = {
 
 export const useWebSocket = (props: UseWebSocketType): UseWebSocketReturn => {
 
-    const { url, params, autoConnect: initialAutoConnect = false } = props;
+    const { url/*: dirtyUrl*/, params, autoConnect: initialAutoConnect = false } = props;
+
+    //const url = dirtyUrl.endsWith('/') ? dirtyUrl : dirtyUrl + '/';
 
     const [autoConnect, setAutoConnect] = useState<boolean>(initialAutoConnect);
     const [isConnected, setIsConnected] = useState<boolean>(false);
