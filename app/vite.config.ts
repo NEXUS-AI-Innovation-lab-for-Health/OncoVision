@@ -3,7 +3,13 @@ import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react({
+      babel: {
+        plugins: [["@babel/plugin-proposal-decorators", { legacy: true }]],
+      },
+    }),
+  ],
   optimizeDeps: {
     // Cornerstone codecs (UMD/CJS) doivent être pré-bundlés par Vite,
     // sinon les imports `default` peuvent casser en dev.

@@ -2,6 +2,10 @@ import type { UseWebSocketReturn } from "../hooks/websocket";
 
 export type WebSocketHandler = (socket: UseWebSocketReturn, data: object) => void;
 
+export interface WebSocketMessage {
+    type: string;
+}
+
 export class WebSocketBus {
 
     private readonly socket: UseWebSocketReturn;
@@ -25,7 +29,8 @@ export class WebSocketBus {
 
     attach(): () => void {
         this.socket.registerListener("websocket_bus", (message: string) => {
-            this.dispatch(message);
+            const count = this.dispatch(message);
+            console.log("Dispatched message to", count, "handlers");
         });
         this.socket.setOnDisconnect(() => {
             this.clean();
@@ -47,30 +52,51 @@ export class WebSocketBus {
         this.handlers[type].push(handler);
     }
 
-    dispatch(raw_message: string) {
+    publish(data: object | string): void {
+        this.socket.sendMessage(data);
+    }
 
-        const message = JSON.parse(raw_message);
+    dispatch(rawMessage: string): number {
+
+        const message = JSON.parse(rawMessage);
         if(!("type" in message))
-            return;
+            return 0;
 
         const type = message.type;
+        console.log("Received message of type", type);  
 
         const list = this.handlers[type] || [];
+        let count = 0;
         for (const fn of list) {
             fn(this.socket, message);
+            count++;
         }
 
+        return count;
     }
 
 }
 
 export function subscribe(type: string) {
     return function (
-        _: any,
-        __: string,
-        descriptor: PropertyDescriptor
+        _targetOrValue: any,
+        _maybeContextOrKey: string | any,
+        descriptor?: PropertyDescriptor
     ) {
-        descriptor.value._subscribeType = type;
-        return descriptor;
+        // Legacy decorator call: (target, propertyKey, descriptor)
+        if (descriptor) {
+            descriptor.value._subscribeType = type;
+            return descriptor;
+        }
+
+        // New decorator call or alternative runtime: the decorator may be called
+        // with (value, context) or with (target, context) depending on the environment.
+        // Attach the marker directly to the function/value when descriptor is not present.
+        try {
+            _targetOrValue._subscribeType = type;
+        } catch (e) {
+            // ignore if we can't assign
+        }
+        return _targetOrValue;
     };
 }

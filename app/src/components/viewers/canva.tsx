@@ -41,6 +41,7 @@ export interface CanvaHandle {
     addShape: (shape: Shape) => void;
     removeShape: (shape: Shape) => void;
     setListener: (listener: (shape: Shape, shapes: Shape[]) => void) => void;
+    setShapes: (shapes: Shape[]) => void;
 }
 
 const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
@@ -125,10 +126,17 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         listenerRef.current = listener;
     };
 
+    const setShapesExternal = (nextShapes: Shape[]) => {
+        setShapes(nextShapes);
+        // Reset preview/drawing state when shapes are replaced externally
+        setPreviewShape(null);
+        setIsDrawing(false);
+    };
+
     useImperativeHandle(ref, () => {
-        const handle = { addShape, removeShape, setListener };
+        const handle = { addShape, removeShape, setListener, setShapes: setShapesExternal };
         return handle;
-    }, [addShape, removeShape, setListener]);
+    }, [addShape, removeShape, setListener, setShapesExternal]);
 
     const toImagePoint = (e: React.PointerEvent<SVGSVGElement>): Point => {
         const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();

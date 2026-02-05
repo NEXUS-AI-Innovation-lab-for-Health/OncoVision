@@ -65,13 +65,13 @@ class WebSocketHandler:
     async def handle_socket(self, websocket: WebSocket) -> None:
         try:
             await websocket.accept()
-            print("WebSocket accepted, calling on_socket_connect...")
 
             await self.on_socket_connect(websocket)
             disconnected = False
             try:
                 while True:
                     data = await websocket.receive_json()
+                    print(f"Received WebSocket message: {data}")
                     await self.bus.dispatch(websocket, data)
             except WebSocketDisconnect as e:
                 disconnected = True
@@ -84,6 +84,9 @@ class WebSocketHandler:
         except Exception as e:
             print(f"Exception in handle_socket: {e}")
             raise
+
+    async def send_message(self, websocket: WebSocket, message: WebSocketMessage) -> None:
+        await websocket.send_json(message.model_dump())
 
     def register_websocket_handlers(self) -> int:
         count = 0
