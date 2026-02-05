@@ -1,24 +1,12 @@
 import { Card, Table, Tag, Button } from "antd";
 import { useNavigate } from "react-router-dom";
 import { usePatients } from "../hooks/usePatients";
+import { getStatusColor } from "../utils/patient";
 import type { Patient } from "../types/patient";
 
 export function PatientList() {
   const navigate = useNavigate();
   const { data: patients, isLoading } = usePatients();
-
-  const getStatusColor = (status?: string) => {
-    switch (status) {
-      case "En traitement":
-        return "processing";
-      case "Rémission":
-        return "success";
-      case "Surveillance":
-        return "warning";
-      default:
-        return "default";
-    }
-  };
 
   const columns = [
     {

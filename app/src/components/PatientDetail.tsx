@@ -1,6 +1,7 @@
 import { Card, Descriptions, Button, Tag, Divider } from "antd";
 import { useNavigate, useParams } from "react-router-dom";
 import { usePatients } from "../hooks/usePatients";
+import { getStatusColor } from "../utils/patient";
 import ImageViewer from "./viewers/image";
 
 export function PatientDetail() {
@@ -20,19 +21,6 @@ export function PatientDetail() {
       </div>
     );
   }
-
-  const getStatusColor = (status?: string) => {
-    switch (status) {
-      case "En traitement":
-        return "processing";
-      case "Rémission":
-        return "success";
-      case "Surveillance":
-        return "warning";
-      default:
-        return "default";
-    }
-  };
 
   return (
     <div style={{ padding: "24px", minHeight: "100vh", background: "#f0f2f5" }}>
