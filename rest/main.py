@@ -18,7 +18,7 @@ from controllers.viewer import ViewerController
 from controllers.patient import PatientController
 
 # Import startup utilities
-from utils.startup import auto_register_images, create_fake_patients
+from utils.startup import auto_register_images, create_sample_patients
 
 # Load env. variables
 dotenv.load_dotenv()
@@ -97,7 +97,9 @@ routers.append(patient_controller)
 # Auto-register images from the images directory at startup
 images_dir = Path(__file__).parent.parent / "images"
 print(f"\n[startup] Auto-registering images from: {images_dir}")
-viewer_controller = routers[0]  # Get the ViewerController instance
+
+# Get ViewerController reference before it might move in the list
+viewer_controller = routers[0]
 image_map = auto_register_images(viewer_controller.registry, images_dir, debug=True)
 
 if image_map:
@@ -107,8 +109,8 @@ if image_map:
 else:
     print(f"[startup] No images registered from {images_dir}")
 
-# Create fake patients with the registered image IDs
-patients = create_fake_patients(image_map)
+# Create sample patients with the registered image IDs
+patients = create_sample_patients(image_map)
 patient_controller.set_patients(patients)
 print(f"\n[startup] Created {len(patients)} patients with valid image IDs")
 

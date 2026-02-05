@@ -63,9 +63,9 @@ def auto_register_images(registry: ImageRegistry, images_dir: Path, debug: bool 
     return image_map
 
 
-def create_fake_patients(image_map: dict[str, str]) -> List[Patient]:
+def create_sample_patients(image_map: dict[str, str]) -> List[Patient]:
     """
-    Create fake patient data with image IDs from registered images.
+    Create sample patient data with image IDs from registered images.
     
     Args:
         image_map: Dictionary mapping image filenames to their registered IDs
