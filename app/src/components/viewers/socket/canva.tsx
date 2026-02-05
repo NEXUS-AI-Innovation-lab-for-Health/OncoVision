@@ -21,7 +21,7 @@ export default function CanvaSocket(props: CanvaSocketProps) {
             setAutoConnect(false);
             disconnect();
         }
-    }, []);
+    }, [disconnect, setAutoConnect]);
 
     return (
         <div>
