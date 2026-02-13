@@ -31,19 +31,19 @@ export default function CanvaSocket(props: CanvaSocketProps) {
     const webSocketBus = useRef<WebSocketBus>(new WebSocketBus(webSocket));
 
     const [sessionId, setSessionId] = useState<string | null>(null);
-    const [shapes, setShapes] = useState<Shape[]>([]);
+    const [_shapes, setShapes] = useState<Shape[]>([]);
 
     class BusHandler {
 
         @subscribe("handshaked")
-        handshaked(socket: ReturnType<typeof useWebSocket>, rawMessage: object): void {
+        handshaked(_socket: ReturnType<typeof useWebSocket>, rawMessage: object): void {
             const message = rawMessage as HandshakedMessage;
             setSessionId(message.sessionId);
             setShapes(message.shapes);
         }
 
         @subscribe("propagate_shape")
-        propagateShape(socket: ReturnType<typeof useWebSocket>, rawMessage: object): void {
+        propagateShape(_socket: ReturnType<typeof useWebSocket>, rawMessage: object): void {
             const message = rawMessage as PropagateShapesMessage;
             if(message.sessionId !== sessionId)
                 return;
@@ -59,7 +59,7 @@ export default function CanvaSocket(props: CanvaSocketProps) {
         bus.register(new BusHandler());
 
         if(handleRef.current) {
-            handleRef.current.setListener((shape: Shape, shapes: Shape[]) => {
+            handleRef.current.setListener((shape: Shape, _shapes: Shape[]) => {
                 webSocketBus.current.publish({
                     type: "add_shape",
                     sessionId,
