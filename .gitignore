@@ -65,4 +65,4 @@ app/.expo/
 app/expo-env.d.ts
 
 # SAE files #
-./images
+/images
