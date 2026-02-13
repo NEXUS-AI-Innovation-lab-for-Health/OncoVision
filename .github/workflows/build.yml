@@ -3,7 +3,7 @@ name: Build
 on:
   push:
     branches:
-        - ci-cd
+        - main
 
 jobs:
 
