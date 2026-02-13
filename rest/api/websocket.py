@@ -34,6 +34,7 @@ class WebSocketBus:
                 try:
                     msg = message_class.model_validate(payload)
                 except Exception as e:
+                    print(f"Error validating message for type {type_}: {e}")
                     # Log error or handle validation failure
                     continue
             else:
@@ -71,7 +72,8 @@ class WebSocketHandler:
             try:
                 while True:
                     data = await websocket.receive_json()
-                    print(f"Received WebSocket message: {data}")
+                    print("Received WebSocket message")
+                    #print(f"Received WebSocket message: {data}")
                     await self.bus.dispatch(websocket, data)
             except WebSocketDisconnect as e:
                 disconnected = True

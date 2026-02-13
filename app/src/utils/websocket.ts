@@ -28,11 +28,15 @@ export class WebSocketBus {
     }
 
     attach(): () => void {
+        console.log("Attaching WebSocketBus to socket");
         this.socket.registerListener("websocket_bus", (message: string) => {
             const count = this.dispatch(message);
             console.log("Dispatched message to", count, "handlers");
         });
-        this.socket.setOnDisconnect(() => {
+        this.socket.setOnDisconnect((event) => {
+            if (event.code === 1001) { // Going away, likely due to page refresh or navigation. Ignore this disconnect.
+                return;
+            }
             this.clean();
         });
         this.socket.connect();

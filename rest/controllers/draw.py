@@ -22,15 +22,15 @@ class DrawSession:
         self.shapes = {}
 
 class HandshakeMessage(WebSocketMessage, type="handshake"):
-    session_id: str
+    session_id: str | None = None
 
 class HandshakedMessage(WebSocketMessage, type="handshaked"):
-    session_id: str
+    session_id: str | None = None
     color: str
     shapes: list[ShapeUnion]
 
 class AddShapeMessage(WebSocketMessage, type="add_shape"):
-    session_id: str
+    session_id: str | None = None
     shape: ShapeUnion
 
 class PropagateShapesMessage(WebSocketMessage, type="propagate_shapes"):
@@ -48,6 +48,9 @@ class DrawController(Controller, WebSocketHandler):
 
     @websocket_subscribe("handshake", HandshakeMessage)
     async def handle_handshake(self, websocket: WebSocket, message: HandshakeMessage) -> None:
+        
+        message.session_id = "Test"
+        
         session = self.sessions.get(message.session_id)
         if not session:
             session = DrawSession(message.session_id)
@@ -68,6 +71,8 @@ class DrawController(Controller, WebSocketHandler):
 
     @websocket_subscribe("add_shape", AddShapeMessage)
     async def handle_add_shape(self, websocket: WebSocket, message: AddShapeMessage) -> None:
+
+        message.session_id = "Test"
         session = self.sessions.get(message.session_id)
         if not session:
             return
@@ -84,7 +89,10 @@ class DrawController(Controller, WebSocketHandler):
         for author in session.authors.values():
             shapes.extend(session.shapes.get(author, []))
 
+        print("Broadcasting new shape to other clients in session")
+
         for ws in session.authors.keys():
+            print("WS is open:", ws.client_state)
             if ws != websocket:
                 await self.send_message(ws, PropagateShapesMessage(
                     session_id=message.session_id,

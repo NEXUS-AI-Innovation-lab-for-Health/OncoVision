@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 type SocketConnectListener = () => void;
 type SocketMessageListener = (message: string) => void;
+type SocketDisconnectListener = (event: CloseEvent) => void;
 
 export type UseWebSocketType = {
     url: string;
@@ -21,7 +22,7 @@ export type UseWebSocketReturn = {
     unregisterListener: (id: string) => void;
 
     setOnConnect: (listener: SocketConnectListener | undefined) => void;
-    setOnDisconnect: (listener: SocketConnectListener | undefined) => void;
+    setOnDisconnect: (listener: SocketDisconnectListener | undefined) => void;
 
     autoConnect: boolean;
     setAutoConnect: (autoConnect: boolean) => void;
@@ -40,7 +41,7 @@ export const useWebSocket = (props: UseWebSocketType): UseWebSocketReturn => {
     const [listeners, setListeners] = useState<Record<string, SocketMessageListener>>({});
 
     const onConnectRef = useRef<SocketConnectListener | undefined>(undefined);
-    const onDisconnectRef = useRef<SocketConnectListener | undefined>(undefined);
+    const onDisconnectRef = useRef<SocketDisconnectListener | undefined>(undefined);
 
     const wsRef = useRef<WebSocket | null>(null);
     const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -116,6 +117,7 @@ export const useWebSocket = (props: UseWebSocketType): UseWebSocketReturn => {
         ws.onmessage = (event) => {
             const message = event.data;
             const currentListeners = listenersRef.current;
+            console.log("There is a message and", Object.keys(currentListeners).length, "listeners to handle it");
             for (const listener of Object.values(currentListeners)) {
                 listener(message);
             }
@@ -130,12 +132,13 @@ export const useWebSocket = (props: UseWebSocketType): UseWebSocketReturn => {
             connectionAttemptRef.current = false;
         };
 
-        ws.onclose = (_) => {
+        ws.onclose = (event) => {
             connectionAttemptRef.current = false;
             setIsConnected(false);
 
-            if (onDisconnectRef.current) {
-                onDisconnectRef.current();
+            const shouldIgnoreDisconnect = event.code === 1001;
+            if (!shouldIgnoreDisconnect && onDisconnectRef.current) {
+                onDisconnectRef.current(event);
             }
 
             if (!autoConnectRef.current)
@@ -192,13 +195,18 @@ export const useWebSocket = (props: UseWebSocketType): UseWebSocketReturn => {
     }, [disconnect]);
 
     const registerListener = useCallback((id: string, listener: SocketMessageListener) => {
-        setListeners((prev) => ({ ...prev, [id]: listener }));
+        setListeners((prev) => {
+            const next = { ...prev, [id]: listener };
+            listenersRef.current = next;
+            return next;
+        });
     }, []);
 
     const unregisterListener = useCallback((id: string) => {
         setListeners((prev) => {
             const newListeners = { ...prev };
             delete newListeners[id];
+            listenersRef.current = newListeners;
             return newListeners;
         });
     }, []);
@@ -207,7 +215,7 @@ export const useWebSocket = (props: UseWebSocketType): UseWebSocketReturn => {
         onConnectRef.current = listener;
     }, []);
 
-    const setOnDisconnect = useCallback((listener: SocketConnectListener | undefined) => {
+    const setOnDisconnect = useCallback((listener: SocketDisconnectListener | undefined) => {
         onDisconnectRef.current = listener;
     }, []);
 
