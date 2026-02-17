@@ -18,6 +18,21 @@ export abstract class Shape {
         return this.type;
     }
 
+    static fromRaw(raw: any): Shape {
+        const json = JSON.stringify(raw);
+        return Shape.fromJson(json);
+    }
+
+    static fromRawArray(raw: any[]): Shape[] {
+        const json = JSON.stringify(raw);
+        return Shape.fromJsonArray(json);
+    }
+
+    static fromJsonArray(json: string): Shape[] {
+        const data = JSON.parse(json) as { type: string }[];
+        return data.map((item) => Shape.fromJson(JSON.stringify(item)));
+    }
+
     static fromJson(json: string): Shape {
         const data = JSON.parse(json) as { type: string };
         switch (data.type) {

@@ -3,7 +3,7 @@ import type { CanvaHandle, CanvaProps } from "../canva";
 import Canva from "../canva";
 import { useRest } from "../../../hooks/rest";
 import { subscribe, WebSocketBus, type WebSocketMessage } from "../../../utils/websocket";
-import type { Shape } from "../../../types/viewer/shapes";
+import { Shape } from "../../../types/viewer/shapes";
 
 interface HandshakedMessage extends WebSocketMessage {
     sessionId: string;
@@ -30,25 +30,40 @@ export default function CanvaSocket(props: CanvaSocketProps) {
     const { setOnConnect } = webSocket;
     const webSocketBus = useRef<WebSocketBus>(new WebSocketBus(webSocket));
 
-    const [sessionId, setSessionId] = useState<string | null>(null);
+    const sessionId = useRef<string | null>(null);
     const [_shapes, setShapes] = useState<Shape[]>([]);
+
+    const lines = [];
+    for (const key in _shapes) {
+        lines.push("Test " + key + ": " + JSON.stringify(_shapes[key]));
+    }
+
+    useEffect(() => {
+        if(handleRef.current) 
+            handleRef.current.setShapes(_shapes);
+    }, [_shapes]);
 
     class BusHandler {
 
         @subscribe("handshaked")
         handshaked(_socket: ReturnType<typeof useWebSocket>, rawMessage: object): void {
             const message = rawMessage as HandshakedMessage;
-            setSessionId(message.sessionId);
-            setShapes(message.shapes);
+            sessionId.current = message.sessionId;
+
+            const shapes: Shape[] = Shape.fromRawArray(message.shapes);
+            console.log("Hanshaked shapes:", shapes);
+
+            setShapes(shapes);
         }
 
-        @subscribe("propagate_shape")
-        propagateShape(_socket: ReturnType<typeof useWebSocket>, rawMessage: object): void {
+        @subscribe("propagate_shapes")
+        propagateShapes(_socket: ReturnType<typeof useWebSocket>, rawMessage: object): void {
             const message = rawMessage as PropagateShapesMessage;
-            if(message.sessionId !== sessionId)
-                return;
 
-            setShapes(message.shapes);
+            const shapes: Shape[] = Shape.fromRawArray(message.shapes);
+            console.log("Propagated shapes:", shapes);
+
+            setShapes(shapes);
         }
 
     }
@@ -62,7 +77,7 @@ export default function CanvaSocket(props: CanvaSocketProps) {
             handleRef.current.setListener((shape: Shape, _shapes: Shape[]) => {
                 webSocketBus.current.publish({
                     type: "add_shape",
-                    sessionId,
+                    sessionId: sessionId.current,
                     shape,
                 });
             });

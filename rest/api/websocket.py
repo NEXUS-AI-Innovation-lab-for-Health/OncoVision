@@ -88,7 +88,9 @@ class WebSocketHandler:
             raise
 
     async def send_message(self, websocket: WebSocket, message: WebSocketMessage) -> None:
-        await websocket.send_json(message.model_dump())
+        await websocket.send_json(message.model_dump(
+            by_alias=True,
+        ))
 
     def register_websocket_handlers(self) -> int:
         count = 0

@@ -92,7 +92,6 @@ class DrawController(Controller, WebSocketHandler):
         print("Broadcasting new shape to other clients in session")
 
         for ws in session.authors.keys():
-            print("WS is open:", ws.client_state)
             if ws != websocket:
                 await self.send_message(ws, PropagateShapesMessage(
                     session_id=message.session_id,
