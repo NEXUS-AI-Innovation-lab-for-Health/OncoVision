@@ -18,5 +18,8 @@ export default defineConfig(({ mode }) => {
       }),
     ],
 
+    preview: {
+      allowedHosts: ['sae.jdsr.dev'],
+    },
   };
 });
