@@ -99,8 +99,8 @@ except Exception as e:
     exit(1)
 
 routers = [
-    ImageController(s3_connection, mongo_connection, mongo_credentials.database),
-    DrawController(mongo_connection, mongo_credentials.database),
+    ImageController(s3_connection, mongo_connection),
+    DrawController(mongo_connection),
 ]
 for router in routers:
     app.include_router(router)

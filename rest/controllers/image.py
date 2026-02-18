@@ -20,13 +20,13 @@ from database.mongo.connection import MongoConnection
 
 class ImageController(Controller):
 
-    def __init__(self, s3_connection: S3Connection, mongo_connection: MongoConnection | None = None, mongo_db: str | None = None) -> None:
+    def __init__(self, s3_connection: S3Connection, mongo_connection: MongoConnection) -> None:
         super().__init__("viewer") # Todo: change name?
 
         bucket = "images"  # You can make this configurable
 
         # Pass Mongo connection + DB name so registry persists records
-        self.registry = ImageRegistry(s3_connection, bucket, mongo_connection=mongo_connection, mongo_db=mongo_db)
+        self.registry = ImageRegistry(s3_connection, bucket, mongo_connection=mongo_connection)
 
         self.add_api_route("/images", self.upload_image, methods=["POST"])
         self.add_api_route("/images/{image_id}/info", self.get_info, methods=["GET"])

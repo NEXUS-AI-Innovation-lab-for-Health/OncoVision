@@ -51,11 +51,11 @@ class PropagateShapesMessage(WebSocketMessage, type="propagate_shapes"):
 
 class DrawController(Controller, WebSocketHandler):
 
-    def __init__(self, mongo_connection: MongoConnection, mongo_db: str) -> None:
+    def __init__(self, mongo_connection: MongoConnection) -> None:
         super().__init__("draw") 
         WebSocketHandler.__init__(self)
         
-        mongo_database = mongo_connection.get_database(mongo_db)
+        mongo_database = mongo_connection.get_database()
         self.collection = mongo_database["drawings"]
 
         self.sessions: dict[str, DrawSession] = {}

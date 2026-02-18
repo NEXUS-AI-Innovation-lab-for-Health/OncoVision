@@ -41,8 +41,7 @@ class ImageRegistry:
         self,
         s3_connection: S3Connection,
         bucket: str,
-        mongo_connection: MongoConnection | None = None,
-        mongo_db: str | None = None,
+        mongo_connection: MongoConnection
     ) -> None:
         self.s3_conn = s3_connection
         self.bucket = bucket
@@ -53,7 +52,7 @@ class ImageRegistry:
         if not self.fs.exists(bucket_path):
             self.fs.mkdir(bucket_path)
 
-        self.collection = mongo_connection.get_database(mongo_db)[bucket]
+        self.collection = mongo_connection.get_database()[bucket]
 
     def register_and_upload_levels(self, kind: ImageFormat, image_path: Path, *, debug: bool = False) -> ImageRecord:
         image_id = uuid4().hex
