@@ -1,4 +1,4 @@
-export type ViewerType = 'openseadragon' | 'cornerstone' | 'auto';
+export type ViewerType = 'openseadragon' | 'auto';
 
 export type ImageType = 'wsi' | 'dicom' | 'dzi' | 'iiif';
 

@@ -19,7 +19,7 @@ jobs:
       - name: Build app image
         working-directory: app
         run: |
-          docker build -t sae-app -f Dockerfile .
+          docker build -t localhost:5000/sae-app:latest -f Dockerfile .
     
   rest:
     runs-on: ubuntu-latest
@@ -33,4 +33,4 @@ jobs:
       - name: Build rest image
         working-directory: rest
         run: |
-          docker build -t sae-rest -f Dockerfile .
+          docker build -t localhost:5000/sae-rest:latest -f Dockerfile .
