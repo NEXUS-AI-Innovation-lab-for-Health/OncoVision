@@ -1,0 +1,107 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: onco_sql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - ./docker/volumes/mysql:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      - onco_network
+
+  minio:
+    image: minio/minio
+    container_name: onco_minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ./docker/volumes/minio:/data
+    networks:
+      - onco_network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: onco_phpmyadmin
+    environment:
+      PMA_HOST: ${PMA_HOST}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      UPLOAD_LIMIT: ${UPLOAD_LIMIT}
+    ports:
+      - "8080:80"
+    depends_on:
+      - mysql
+    networks:
+      - onco_network
+
+  mongodb:
+    image: mongo:8.2.1
+    container_name: onco_mongo
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE}
+    volumes:
+      - ./docker/volumes/mongo:/data/db
+    ports:
+      - "27017:27017"
+    networks:
+      - onco_network
+
+  rest:
+    image: localhost:5000/sae-rest:latest
+    build:
+      context: ./rest
+      dockerfile: Dockerfile
+    container_name: onco_rest
+    environment:
+      PORT: ${PORT}
+      MONGO_HOST: ${MONGO_HOST}
+      MONGO_PORT: ${MONGO_PORT}
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_DATABASE: ${MONGO_DATABASE}
+      S3_HOST: "${S3_HOST}"
+      S3_PORT: ${S3_PORT}
+      S3_USER: ${S3_USER}
+      S3_PASSWORD: ${S3_PASSWORD}
+      SQL_HOST: ${SQL_HOST}
+      SQL_PORT: ${SQL_PORT}
+      SQL_USER: ${SQL_USER}
+      SQL_PASSWORD: ${SQL_PASSWORD}
+      SQL_DATABASE: ${SQL_DATABASE}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongodb
+      - minio
+      - mysql
+    networks:
+      - onco_network
+
+  web:
+    image: localhost:5000/sae-app:latest
+    container_name: onco_web
+    environment:
+      VITE_API_URL: "${VITE_API_URL}"
+      REACT_APP_API_URL: "${REACT_APP_API_URL}"
+    ports:
+      - "5173:5173"
+    depends_on:
+      - rest
+    networks:
+      - onco_network
+
+networks:
+  onco_network:
+    name: onco_network
+    driver: bridge

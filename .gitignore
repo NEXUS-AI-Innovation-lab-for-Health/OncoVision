@@ -69,3 +69,6 @@ app/expo-env.d.ts
 
 # Workflow repo
 /workflows
+
+# Env files
+.env

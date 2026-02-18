@@ -40,3 +40,17 @@ jobs:
         run: |
           docker build -t localhost:5000/sae-rest:latest -f Dockerfile .
           docker push localhost:5000/sae-rest:latest
+
+  sync-compose:
+    runs-on: ubuntu-latest
+    container:
+      image: node:16-buster-slim
+      volumes:
+        - /home/super_crafting/sae:/sae  
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Copy compose file to workspace
+        run: |
+          cp compose.yml /sae/docker/compose.yml
