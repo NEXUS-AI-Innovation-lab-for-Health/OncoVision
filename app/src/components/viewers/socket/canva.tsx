@@ -33,11 +33,6 @@ export default function CanvaSocket(props: CanvaSocketProps) {
     const sessionId = useRef<string | null>(null);
     const [_shapes, setShapes] = useState<Shape[]>([]);
 
-    const lines = [];
-    for (const key in _shapes) {
-        lines.push("Test " + key + ": " + JSON.stringify(_shapes[key]));
-    }
-
     useEffect(() => {
         if(handleRef.current) 
             handleRef.current.setShapes(_shapes);

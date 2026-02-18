@@ -16,15 +16,17 @@ from utils.image import (
     detect_format_from_path,
 )
 from database.s3.connection import S3Connection
+from database.mongo.connection import MongoConnection
 
 class ImageController(Controller):
 
-    def __init__(self, s3_connection: S3Connection) -> None:
+    def __init__(self, s3_connection: S3Connection, mongo_connection: MongoConnection | None = None, mongo_db: str | None = None) -> None:
         super().__init__("viewer") # Todo: change name?
 
         bucket = "images"  # You can make this configurable
 
-        self.registry = ImageRegistry(s3_connection, bucket)
+        # Pass Mongo connection + DB name so registry persists records
+        self.registry = ImageRegistry(s3_connection, bucket, mongo_connection=mongo_connection, mongo_db=mongo_db)
 
         self.add_api_route("/images", self.upload_image, methods=["POST"])
         self.add_api_route("/images/{image_id}/info", self.get_info, methods=["GET"])

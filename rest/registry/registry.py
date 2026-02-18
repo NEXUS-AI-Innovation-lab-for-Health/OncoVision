@@ -10,6 +10,7 @@ import shutil
 from PIL import Image
 from openslide.lowlevel import OpenSlideUnsupportedFormatError
 from database.s3.connection import S3Connection
+from database.mongo.connection import MongoConnection
 from utils.image import (
     ImageFormat,
     DeepZoomImage,
@@ -36,15 +37,23 @@ class ImageRecord:
 
 class ImageRegistry:
 
-    def __init__(self, s3_connection: S3Connection, bucket: str) -> None:
+    def __init__(
+        self,
+        s3_connection: S3Connection,
+        bucket: str,
+        mongo_connection: MongoConnection | None = None,
+        mongo_db: str | None = None,
+    ) -> None:
         self.s3_conn = s3_connection
         self.bucket = bucket
         self.fs = self.s3_conn.get_session()
+        
         # Ensure bucket exists (avoid trailing-slash issues with different s3fs versions)
         bucket_path = f"{self.bucket}"
         if not self.fs.exists(bucket_path):
             self.fs.mkdir(bucket_path)
-        self._records: dict[str, ImageRecord] = {}
+
+        self.collection = mongo_connection.get_database(mongo_db)[bucket]
 
     def register_and_upload_levels(self, kind: ImageFormat, image_path: Path, *, debug: bool = False) -> ImageRecord:
         image_id = uuid4().hex
@@ -85,7 +94,11 @@ class ImageRegistry:
             tile_size=info.tile_size,
             tiles_prefix=tiles_prefix,
         )
-        self._records[image_id] = record
+        self.collection.replace_one(
+            {"_id": image_id},
+            self._record_to_document(record),
+            upsert=True,
+        )
 
         if debug:
             print(
@@ -95,10 +108,36 @@ class ImageRegistry:
         return record
 
     def get(self, image_id: str) -> ImageRecord:
-        record = self._records.get(image_id)
-        if not record:
+        doc = self.collection.find_one({"_id": image_id})
+        if not doc:
             raise KeyError(image_id)
-        return record
+        return self._document_to_record(doc)
+
+    def _record_to_document(self, record: ImageRecord) -> dict:
+        return {
+            "_id": record.id,
+            "kind": record.kind,
+            "bucket": record.bucket,
+            "source_key": record.source_key,
+            "levels": record.levels,
+            "width": record.width,
+            "height": record.height,
+            "tile_size": record.tile_size,
+            "tiles_prefix": record.tiles_prefix,
+        }
+
+    def _document_to_record(self, document: dict) -> ImageRecord:
+        return ImageRecord(
+            id=document["_id"],
+            kind=document["kind"],
+            bucket=document["bucket"],
+            source_key=document["source_key"],
+            levels=document["levels"],
+            width=document["width"],
+            height=document["height"],
+            tile_size=document.get("tile_size", 256),
+            tiles_prefix=document.get("tiles_prefix"),
+        )
 
     def get_level_png(self, image_id: str, level: int) -> bytes:
         record = self.get(image_id)

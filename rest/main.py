@@ -99,7 +99,7 @@ except Exception as e:
     exit(1)
 
 routers = [
-    ImageController(s3_connection),
+    ImageController(s3_connection, mongo_connection, mongo_credentials.database),
     DrawController(),
 ]
 for router in routers:
