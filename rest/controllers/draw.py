@@ -3,6 +3,7 @@ import random
 
 from api.controller import Controller
 from api.websocket import WebSocketHandler, WebSocketMessage, websocket_subscribe
+from database.mongo.connection import MongoConnection
 from models.form import Shape, ShapeUnion, Bordered
 
 class DrawAuthor:
@@ -20,6 +21,17 @@ class DrawSession:
         self.image_id = image_id
         self.authors = {}
         self.shapes = {}
+
+    def as_document(self):
+
+        return {
+            "image_id": self.image_id,
+            "authors": {str(id(ws)): author.color for ws, author in self.authors.items()},
+            "shapes": {
+                str(id(author)): [shape.model_dump() for shape in shapes]
+                for author, shapes in self.shapes.items()
+            },
+        }
 
 class HandshakeMessage(WebSocketMessage, type="handshake"):
     session_id: str | None = None
@@ -39,9 +51,12 @@ class PropagateShapesMessage(WebSocketMessage, type="propagate_shapes"):
 
 class DrawController(Controller, WebSocketHandler):
 
-    def __init__(self):
+    def __init__(self, mongo_connection: MongoConnection, mongo_db: str) -> None:
         super().__init__("draw") 
         WebSocketHandler.__init__(self)
+        
+        mongo_database = mongo_connection.get_database(mongo_db)
+        self.collection = mongo_database["drawings"]
 
         self.sessions: dict[str, DrawSession] = {}
         self.add_api_websocket_route(f"/join_draw", self.handle_socket)
@@ -93,7 +108,11 @@ class DrawController(Controller, WebSocketHandler):
         for author in session.authors.values():
             shapes.extend(session.shapes.get(author, []))
 
-        print("Broadcasting new shape to other clients in session")
+        self.collection.update_one(
+            {"image_id": session.image_id},
+            {"$set": session.as_document()},
+            upsert=True,
+        )
 
         for ws in session.authors.keys():
             if ws != websocket:
