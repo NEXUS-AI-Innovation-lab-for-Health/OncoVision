@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, type ComponentType } from "react";
 import { Slider, Button, Tooltip } from "antd";
-import { FiZoomIn, FiZoomOut, FiMaximize2, FiMinimize2, FiChevronLeft, FiChevronRight } from "react-icons/fi";
+import { FiZoomIn, FiZoomOut, FiMaximize2 } from "react-icons/fi";
 import { useRest } from "../../hooks/rest";
 import ImagePreview from "./preview"; // New import
 import Canva from "./canva";
-import type { CanvaHandle, CanvaTool } from "./canva";
+import type { CanvaHandle, CanvaTool, CanvaProps } from "./canva";
 
 // Small inline icons to avoid extra dependencies and ensure consistent look on dark background
 const ToolIcon = ({ name, size = 14 }: { name: string; size?: number }) => {
@@ -66,6 +66,10 @@ const ToolIcon = ({ name, size = 14 }: { name: string; size?: number }) => {
 
 interface ImageViewerProps {
     imageId: string;
+    canva?: {
+        type: ComponentType<CanvaProps>;
+        props?: Partial<CanvaProps>;
+    };
 }
 
 interface ViewState {
@@ -79,7 +83,12 @@ interface ViewState {
 const tileCache = new Map<string, HTMLImageElement>();
 const activeFetches = new Set<string>();
 
-export default function ImageViewer({ imageId }: ImageViewerProps) {
+export default function ImageViewer(props: ImageViewerProps) {
+
+    const { imageId, canva } = props;
+    const CanvaComponent = canva?.type || Canva;
+    const canvaProps = canva?.props || {};
+
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const canvaRef = useRef<CanvaHandle>(null);
@@ -95,22 +104,6 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
     const [isDrawingActive, setIsDrawingActive] = useState(false);
     const [canvasSize, setCanvasSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
     const [activeTool, setActiveTool] = useState<CanvaTool>("pan");
-    const [isMobile, setIsMobile] = useState(false);
-    const [isToolbarMinimized, setIsToolbarMinimized] = useState(false);
-    const [isFullscreen, setIsFullscreen] = useState(false);
-    
-    // Touch support refs
-    const lastTouchDistance = useRef<number | null>(null);
-    const lastTouchCenter = useRef<{ x: number, y: number } | null>(null);
-
-    useEffect(() => {
-        const checkMobile = () => {
-            setIsMobile(window.innerWidth < 768);
-        };
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
-    }, []);
 
     // 1. Fetch image info
     const { data: info, refetch } = useQuery<any>({
@@ -135,12 +128,10 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
             const containerW = containerRef.current.clientWidth;
             const containerH = containerRef.current.clientHeight;
             
+            // Initial zoom to see the entire image (contain) without excessive margin
             const scaleX = containerW / info.width;
             const scaleY = containerH / info.height;
-
-            // Initial zoom: much closer by default (zoom value of 0.5 or 0.8 depending on needs, 
-            // but let's go with a fixed high scale or a multiple of the fit-to-screen zoom)
-            const initialZoom = Math.max(0.5, Math.min(scaleX, scaleY) * 4);
+            const initialZoom = Math.min(scaleX, scaleY);
 
             const newState = {
                 x: info.width / 2,
@@ -413,82 +404,6 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
         }));
     };
 
-    // Touch event handlers for mobile/tablet
-    const handleTouchStart = (e: React.TouchEvent) => {
-        if (isDrawingActive) return;
-        
-        if (e.touches.length === 1) {
-            // Single touch - pan
-            const touch = e.touches[0];
-            setIsDragging(true);
-            lastMousePos.current = { x: touch.clientX, y: touch.clientY };
-        } else if (e.touches.length === 2) {
-            // Two finger touch - prepare for pinch zoom
-            const touch1 = e.touches[0];
-            const touch2 = e.touches[1];
-            
-            const dx = touch2.clientX - touch1.clientX;
-            const dy = touch2.clientY - touch1.clientY;
-            lastTouchDistance.current = Math.sqrt(dx * dx + dy * dy);
-            
-            lastTouchCenter.current = {
-                x: (touch1.clientX + touch2.clientX) / 2,
-                y: (touch1.clientY + touch2.clientY) / 2
-            };
-        }
-    };
-
-    const handleTouchMove = (e: React.TouchEvent) => {
-        if (isDrawingActive) return;
-        
-        // Prevent default only if possible (avoid passive event listener error)
-        try {
-            e.preventDefault();
-        } catch (err) {
-            // Ignore passive event listener error
-        }
-        
-        if (e.touches.length === 1 && isDragging && lastMousePos.current) {
-            // Single touch pan
-            const touch = e.touches[0];
-            const dx = touch.clientX - lastMousePos.current.x;
-            const dy = touch.clientY - lastMousePos.current.y;
-            lastMousePos.current = { x: touch.clientX, y: touch.clientY };
-
-            setViewState(prev => ({
-                ...prev,
-                x: prev.x - dx / prev.zoom,
-                y: prev.y - dy / prev.zoom,
-            }));
-        } else if (e.touches.length === 2 && lastTouchDistance.current !== null) {
-            // Two finger pinch zoom
-            const touch1 = e.touches[0];
-            const touch2 = e.touches[1];
-            
-            const dx = touch2.clientX - touch1.clientX;
-            const dy = touch2.clientY - touch1.clientY;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            const scale = distance / lastTouchDistance.current;
-            lastTouchDistance.current = distance;
-            
-            setViewState(prev => {
-                let newZoom = prev.zoom * scale;
-                newZoom = Math.max(0.001, Math.min(1, newZoom));
-                return { ...prev, zoom: newZoom };
-            });
-        }
-    };
-
-    const handleTouchEnd = () => {
-        if (isDrawingActive) return;
-        setIsDragging(false);
-        lastMousePos.current = null;
-        lastTouchDistance.current = null;
-        lastTouchCenter.current = null;
-        checkBounds();
-    };
-
     // Convenient zoom helpers
     const zoomBy = (factor: number) => setViewState(prev => {
         let newZoom = prev.zoom * factor;
@@ -506,32 +421,6 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
         // Animate instead of hard set for better feel
         animateTo({ x: info.width / 2, y: info.height / 2, zoom: initialZoom });
     };
-
-    const toggleFullscreen = async () => {
-        if (!containerRef.current) return;
-        
-        try {
-            if (!document.fullscreenElement) {
-                await containerRef.current.requestFullscreen();
-                setIsFullscreen(true);
-            } else {
-                await document.exitFullscreen();
-                setIsFullscreen(false);
-            }
-        } catch (err) {
-            console.error('Fullscreen error:', err);
-        }
-    };
-
-    // Listen for fullscreen changes
-    useEffect(() => {
-        const handleFullscreenChange = () => {
-            setIsFullscreen(!!document.fullscreenElement);
-        };
-        
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    }, []);
 
     // Redraw when state changes
     useEffect(() => {
@@ -565,7 +454,15 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
 
     if (!info) return <div style={{ color: "white" }}>Chargement des métadonnées...</div>;
 
-    const showToolbar = isFullscreen || !isMobile;
+    const defaultCanvaProps: CanvaProps = {
+        viewState,
+        width: canvasSize.w,
+        height: canvasSize.h,
+        activeTool,
+        onDrawingActiveChange: setIsDrawingActive,
+        imageWidth: info.width,
+        imageHeight: info.height,
+    };
 
     return (
         <div 
@@ -576,297 +473,156 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                 backgroundColor: "#111", 
                 position: "relative", 
                 overflow: "hidden", 
-                cursor: activeTool === "pan" ? "move" : "crosshair",
-                touchAction: "none",
-                borderRadius: isFullscreen ? 0 : 12,
+                cursor: activeTool === "pan" ? "move" : "crosshair" 
             }}
             onMouseDown={handleMouseDown}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
             onMouseMove={handleMouseMove}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
         >
-            {/* Fullscreen Prompt Overlay for Mobile */}
-            {isMobile && !isFullscreen && (
-                <div 
-                    onClick={toggleFullscreen}
-                    style={{
-                        position: 'absolute',
-                        inset: 0,
-                        zIndex: 1000,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: 'rgba(0,0,0,0.3)',
-                        backdropFilter: 'blur(4px)',
-                        color: '#FFF',
-                        cursor: 'pointer'
-                    }}
-                >
-                    <div style={{ 
-                        background: 'rgba(20,22,25,0.8)',
-                        padding: '20px',
-                        borderRadius: '50%',
-                        boxShadow: '0 4px 15px rgba(0,0,0,0.4)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        border: '1px solid rgba(255,255,255,0.1)'
-                    }}>
-                        <FiMaximize2 size={32} />
-                    </div>
-                    <span style={{ marginTop: 12, fontSize: 12, fontWeight: 500, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
-                        Cliquer pour agrandir
-                    </span>
-                </div>
-            )}
-
-            {/* Minimized toolbar - just toggle button */}
-            {isToolbarMinimized && showToolbar && (
-                <div style={{
-                    position: 'absolute',
-                    left: isMobile ? 6 : 12,
-                    top: isMobile ? 6 : 12,
-                    zIndex: 300,
-                }} onMouseDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
-                    <Tooltip title="Afficher la barre d'outils" placement="right">
-                        <Button
-                            type="text"
-                            shape="circle"
-                            size="small"
-                            icon={<FiChevronRight size={isMobile ? 12 : 13} />}
-                            onClick={() => setIsToolbarMinimized(false)}
-                            style={{ 
-                                color: '#E9EEF5', 
-                                background: 'rgba(20,22,25,0.95)',
-                                border: '1px solid rgba(255,255,255,0.08)',
-                                backdropFilter: 'blur(10px)'
-                            }}
-                        />
-                    </Tooltip>
-                </div>
-            )}
-
-            {/* Full toolbar */}
-            {!isToolbarMinimized && showToolbar && (
             <div style={{
                 position: 'absolute',
-                left: isMobile ? 6 : 12,
-                top: isMobile ? 6 : 12,
+                left: 16,
+                top: 16,
                 zIndex: 300,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: isMobile ? 4 : 6,
-                padding: isMobile ? '6px' : '8px',
+                gap: 10,
+                padding: '12px',
                 background: 'linear-gradient(180deg, rgba(20,22,25,0.95), rgba(14,15,17,0.9))',
-                borderRadius: isMobile ? 6 : 8,
+                borderRadius: 12,
                 backdropFilter: 'blur(10px)',
                 border: '1px solid rgba(255,255,255,0.08)',
                 boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
                 color: '#E9EEF5',
-                width: isMobile ? 44 : 80,
-                maxHeight: 'calc(100% - 24px)',
-                overflowY: 'auto',
-                scrollbarWidth: 'none',
-                msOverflowStyle: 'none',
-            }} onMouseDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
-                {/* Minimize button at top */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: isMobile ? 2 : 4 }}>
-                    <Tooltip title="Masquer la barre d'outils" placement="right">
-                        <Button
-                            type="text"
-                            size="small"
-                            icon={<FiChevronLeft size={10} />}
-                            onClick={() => setIsToolbarMinimized(true)}
-                            style={{ 
-                                color: '#E9EEF5', 
-                                background: 'transparent',
-                                border: 'none',
-                                padding: '1px',
-                                height: 'auto',
-                                minHeight: 'auto'
-                            }}
-                        />
-                    </Tooltip>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 4 : 5, alignItems: 'center' }}>
-                    <Tooltip title="Zoom -" placement="right">
-                        <Button
-                            type="text"
-                            shape="circle"
-                            size="small"
-                            icon={<FiZoomOut size={isMobile ? 12 : 13} />}
-                            onClick={() => zoomBy(1 / 1.25)}
-                            style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
-                        />
-                    </Tooltip>
-                    {!isMobile && (
-                        <div style={{ height: 70, padding: '4px 0' }}>
-                            <Slider
-                                vertical
-                                min={0.01}
-                                max={1}
-                                step={0.01}
-                                value={viewState.zoom}
-                                onChange={(value: number) => setViewState(prev => ({ ...prev, zoom: value }))}
-                                tooltip={{ formatter: (value: number | undefined) => `Zoom: ${Math.round((value || 0) * 100)}%`, placement: 'right' }}
-                                handleStyle={{ borderColor: '#1366FF', background: '#1366FF' }}
-                                trackStyle={{ backgroundColor: '#1366FF' }}
-                                railStyle={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
-                            />
-                        </div>
-                    )}
+                width: 120
+            }} onMouseDown={e => e.stopPropagation()}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
                     <Tooltip title="Zoom +" placement="right">
                         <Button
                             type="text"
                             shape="circle"
                             size="small"
-                            icon={<FiZoomIn size={isMobile ? 12 : 13} />}
+                            icon={<FiZoomIn size={16} />}
                             onClick={() => zoomBy(1.25)}
                             style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
                         />
                     </Tooltip>
-                    <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.06)', margin: isMobile ? '2px 0' : '3px 0' }} />
+                    <div style={{ height: 110, padding: '6px 0' }}>
+                        <Slider
+                            vertical
+                            min={0.01}
+                            max={1}
+                            step={0.01}
+                            value={viewState.zoom}
+                            onChange={(value: number) => setViewState(prev => ({ ...prev, zoom: value }))}
+                            tooltip={{ formatter: (value: number | undefined) => `Zoom: ${Math.round((value || 0) * 100)}%`, placement: 'right' }}
+                            handleStyle={{ borderColor: '#1366FF', background: '#1366FF' }}
+                            trackStyle={{ backgroundColor: '#1366FF' }}
+                            railStyle={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
+                        />
+                    </div>
+                    <Tooltip title="Zoom -" placement="right">
+                        <Button
+                            type="text"
+                            shape="circle"
+                            size="small"
+                            icon={<FiZoomOut size={16} />}
+                            onClick={() => zoomBy(1 / 1.25)}
+                            style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
+                        />
+                    </Tooltip>
+                    <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.06)', margin: '6px 0' }} />
                     <Tooltip title="Ajuster à l'écran" placement="right">
                         <Button
                             type="text"
                             shape="circle"
                             size="small"
-                            icon={<FiMaximize2 size={isMobile ? 12 : 13} />}
+                            icon={<FiMaximize2 size={16} />}
                             onClick={fitToScreen}
-                            style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
-                        />
-                    </Tooltip>
-                    <Tooltip title={isFullscreen ? "Quitter plein écran" : "Plein écran"} placement="right">
-                        <Button
-                            type="text"
-                            shape="circle"
-                            size="small"
-                            icon={isFullscreen ? <FiMinimize2 size={isMobile ? 12 : 13} /> : <FiMaximize2 size={isMobile ? 12 : 13} />}
-                            onClick={toggleFullscreen}
                             style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
                         />
                     </Tooltip>
                 </div>
 
-                <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.06)', margin: isMobile ? '4px 0' : '5px 0' }} />
+                <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 4 : 5 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <Button
                         type={activeTool === 'pan' ? 'primary' : 'text'}
                         size="small"
-                        icon={<ToolIcon name="pan" size={isMobile ? 14 : 11} />}
+                        icon={<ToolIcon name="pan" />}
                         onClick={() => setActiveTool('pan')}
-                        style={activeTool === 'pan' ? { 
-                            background: '#1366FF', 
-                            color: '#FFF', 
-                            borderRadius: 6, 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center', 
-                            padding: isMobile ? '6px 0' : '4px 6px',
-                            width: '100%',
-                            fontSize: 11
-                        } : { 
-                            color: '#E9EEF5', 
-                            background: 'transparent', 
-                            border: '1px solid rgba(255,255,255,0.02)', 
-                            borderRadius: 6, 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center', 
-                            padding: isMobile ? '6px 0' : '4px 6px',
-                            width: '100%',
-                            fontSize: 11
-                        }}
+                        style={activeTool === 'pan' ? { background: '#1366FF', color: '#FFF', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
                     >
-                        {!isMobile && <span style={{ marginLeft: 4 }}>Pan</span>}
+                        Pan
                     </Button>
 
                     <Button
                         type={activeTool === 'pensil' ? 'primary' : 'text'}
                         size="small"
-                        icon={<ToolIcon name="pensil" size={isMobile ? 14 : 11} />}
+                        icon={<ToolIcon name="pensil" />}
                         onClick={() => setActiveTool('pensil')}
-                        style={activeTool === 'pensil' ? { background: '#1366FF', color: '#FFF', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '6px 0' : '4px 6px', width: '100%', fontSize: 11 } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '6px 0' : '4px 6px', width: '100%', fontSize: 11 }}
+                        style={activeTool === 'pensil' ? { background: '#1366FF', color: '#FFF', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
                     >
-                        {!isMobile && <span style={{ marginLeft: 4 }}>Crayon</span>}
+                        Crayon
                     </Button>
 
                     <Button
                         type={activeTool === 'line' ? 'primary' : 'text'}
                         size="small"
-                        icon={<ToolIcon name="line" size={isMobile ? 14 : 11} />}
+                        icon={<ToolIcon name="line" />}
                         onClick={() => setActiveTool('line')}
-                        style={activeTool === 'line' ? { background: '#1366FF', color: '#FFF', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '6px 0' : '4px 6px', width: '100%', fontSize: 11 } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '6px 0' : '4px 6px', width: '100%', fontSize: 11 }}
+                        style={activeTool === 'line' ? { background: '#1366FF', color: '#FFF', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
                     >
-                        {!isMobile && <span style={{ marginLeft: 4 }}>Ligne</span>}
+                        Ligne
                     </Button>
 
                     <Button
                         type={activeTool === 'rectangle' ? 'primary' : 'text'}
                         size="small"
-                        icon={<ToolIcon name="rectangle" size={isMobile ? 14 : 11} />}
+                        icon={<ToolIcon name="rectangle" />}
                         onClick={() => setActiveTool('rectangle')}
-                        style={activeTool === 'rectangle' ? { background: '#1366FF', color: '#FFF', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '6px 0' : '4px 6px', width: '100%', fontSize: 11 } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '6px 0' : '4px 6px', width: '100%', fontSize: 11 }}
+                        style={activeTool === 'rectangle' ? { background: '#1366FF', color: '#FFF', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
                     >
-                        {!isMobile && <span style={{ marginLeft: 4 }}>Rect.</span>}
+                        Rectangle
                     </Button>
 
                     <Button
                         type={activeTool === 'circle' ? 'primary' : 'text'}
                         size="small"
-                        icon={<ToolIcon name="circle" size={isMobile ? 14 : 11} />}
+                        icon={<ToolIcon name="circle" />}
                         onClick={() => setActiveTool('circle')}
-                        style={activeTool === 'circle' ? { background: '#1366FF', color: '#FFF', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '6px 0' : '4px 6px', width: '100%', fontSize: 11 } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '6px 0' : '4px 6px', width: '100%', fontSize: 11 }}
+                        style={activeTool === 'circle' ? { background: '#1366FF', color: '#FFF', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
                     >
-                        {!isMobile && <span style={{ marginLeft: 4 }}>Cercle</span>}
+                        Cercle
                     </Button>
 
                     <Button
                         type={activeTool === 'ellipse' ? 'primary' : 'text'}
                         size="small"
-                        icon={<ToolIcon name="ellipse" size={isMobile ? 14 : 11} />}
+                        icon={<ToolIcon name="ellipse" />}
                         onClick={() => setActiveTool('ellipse')}
-                        style={activeTool === 'ellipse' ? { background: '#1366FF', color: '#FFF', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '6px 0' : '4px 6px', width: '100%', fontSize: 11 } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '6px 0' : '4px 6px', width: '100%', fontSize: 11 }}
+                        style={activeTool === 'ellipse' ? { background: '#1366FF', color: '#FFF', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
                     >
-                        {!isMobile && <span style={{ marginLeft: 4 }}>Ellip.</span>}
+                        Ellipse
                     </Button>
 
                     <Button
                         type={activeTool === 'polygon' ? 'primary' : 'text'}
                         size="small"
-                        icon={<ToolIcon name="polygon" size={isMobile ? 14 : 11} />}
+                        icon={<ToolIcon name="polygon" />}
                         onClick={() => setActiveTool('polygon')}
-                        style={activeTool === 'polygon' ? { background: '#1366FF', color: '#FFF', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '6px 0' : '4px 6px', width: '100%', fontSize: 11 } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '6px 0' : '4px 6px', width: '100%', fontSize: 11 }}
+                        style={activeTool === 'polygon' ? { background: '#1366FF', color: '#FFF', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
                     >
-                        {!isMobile && <span style={{ marginLeft: 4 }}>Poly.</span>}
+                        Polygone
                     </Button>
 
-                    <Button
-                        danger
-                        type="text"
-                        size="small"
-                        icon={<ToolIcon name="erase" size={isMobile ? 14 : 11} />}
-                        onClick={() => {
-                            canvaRef.current?.clear();
-                            setActiveTool('pan');
-                        }}
-                        style={{ color: '#FF6B6B', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '6px 0' : '4px 6px', width: '100%', fontSize: 11 }}
-                    >
-                        {!isMobile && <span style={{ marginLeft: 4 }}>Effac.</span>}
-                    </Button>
                 </div>
             </div>
-            )}
 
-            {/* Thumbnail preview (hidden on mobile to keep toolbar visible) */}
-            {!isMobile && (
-            <div style={{ position: 'absolute', right: isMobile ? 8 : 16, top: isMobile ? 8 : 16, zIndex: 300 }}>
+            {/* Thumbnail preview */}
+            <div style={{ position: 'absolute', right: 16, top: 16, zIndex: 300 }}>
                 <ImagePreview
                     info={info}
                     imageId={imageId}
@@ -877,22 +633,16 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                     containerH={containerRef.current?.clientHeight || 0}
                 />
             </div>
-            )}
 
             <canvas 
                 ref={canvasRef} 
                 style={{ display: "block", width: "100%", height: "100%" }} 
             />
 
-            <Canva
+            <CanvaComponent
                 ref={canvaRef}
-                viewState={viewState}
-                width={canvasSize.w}
-                height={canvasSize.h}
-                activeTool={activeTool}
-                onDrawingActiveChange={setIsDrawingActive}
-                imageWidth={info.width}
-                imageHeight={info.height}
+                {...defaultCanvaProps}
+                {...canvaProps}
             />
         </div>
     );
