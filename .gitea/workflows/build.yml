@@ -53,4 +53,4 @@ jobs:
 
       - name: Copy compose file to workspace
         run: |
-          cp compose.yml /sae/docker/compose.yml
+          cp compose.yml /sae/compose.yml
