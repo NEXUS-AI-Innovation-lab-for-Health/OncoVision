@@ -2,7 +2,7 @@ import { CookiesProvider } from "react-cookie";
 import { RestProvider } from "./hooks/rest";
 import ImageUploader from "./components/file/upload";
 
-const apiUrl = import.meta.env.API_URL as string;
+const apiUrl = window.__APP_CONFIG__.API_URL;
 
 export default function App() {
     return (

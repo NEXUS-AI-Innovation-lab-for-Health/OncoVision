@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
 
-interface ImportMetaEnv {
-  readonly API_URL?: string;
+interface AppConfig {
+  API_URL: string;
 }
 
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
+interface Window {
+  __APP_CONFIG__: AppConfig;
 }
