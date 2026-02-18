@@ -40,9 +40,10 @@ class ImageRegistry:
         self.s3_conn = s3_connection
         self.bucket = bucket
         self.fs = self.s3_conn.get_session()
-        # Ensure bucket exists
-        if not self.fs.exists(f"{self.bucket}/"):
-            self.fs.mkdir(f"{self.bucket}/")
+        # Ensure bucket exists (avoid trailing-slash issues with different s3fs versions)
+        bucket_path = f"{self.bucket}"
+        if not self.fs.exists(bucket_path):
+            self.fs.mkdir(bucket_path)
         self._records: dict[str, ImageRecord] = {}
 
     def register_and_upload_levels(self, kind: ImageFormat, image_path: Path, *, debug: bool = False) -> ImageRecord:
