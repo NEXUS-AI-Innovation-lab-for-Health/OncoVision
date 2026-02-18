@@ -45,7 +45,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     width,
     height,
     activeTool,
-    strokeColor = "#ff3b30",
+    strokeColor = "#00ff00",
     strokeWidth = 2,
     initialShapes = [],
     onShapeCreated,

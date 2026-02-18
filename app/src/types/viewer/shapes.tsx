@@ -107,18 +107,60 @@ export class Line extends Shape implements Bordered {
   }
 
   renderLabel(metrics: ShapeMetrics): ReactNode {
-    const { centroid, length } = metrics;
+    const { length } = metrics;
+    const lengthPx = length ?? 0;
+    const PX_TO_MM = 25.4 / 96;
+    const lengthMm = lengthPx * PX_TO_MM;
+
+    const dx = this.end.x - this.start.x;
+    const dy = this.end.y - this.start.y;
+    const segLen = Math.hypot(dx, dy) || 1;
+    const ux = dx / segLen;
+    const uy = dy / segLen;
+    const px = -uy;
+    const py = ux;
+
+    const labelOffset = 12;
+    const labelX = this.end.x + px * labelOffset + ux * 6;
+    const labelY = this.end.y + py * labelOffset + uy * 6;
+    const lineHeight = 16;
+
     return (
-      <text
-        x={centroid.x}
-        y={centroid.y - 10}
-        textAnchor="middle"
-        fontSize="12"
-        fill="#000"
-        fontWeight="bold"
-      >
-        {length?.toFixed(1) ?? 0}px
-      </text>
+      <g>
+        <text
+          x={labelX + 4}
+          y={labelY - 8}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          A: ({this.start.x.toFixed(1)}, {this.start.y.toFixed(1)})
+        </text>
+        <text
+          x={labelX + 4}
+          y={labelY + 8}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          B: ({this.end.x.toFixed(1)}, {this.end.y.toFixed(1)})
+        </text>
+        <text
+          x={labelX + 4}
+          y={labelY + 24}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          {lengthMm.toFixed(1)} mm
+        </text>
+      </g>
     );
   }
 }
@@ -171,17 +213,85 @@ export class Circle extends Shape implements Bordered {
 
   renderLabel(metrics: ShapeMetrics): ReactNode {
     const { centroid } = metrics;
+    const area = metrics.area || 0;
+    const diameter = (this.radius * 2).toFixed(1);
+    const circumference = (metrics.perimeter ?? (2 * Math.PI * this.radius)).toFixed(1);
+    const radius = this.radius.toFixed(1);
+    const areaValue = area.toFixed(0);
+
+    const labelX = centroid.x + this.radius + 10;
+    const labelY = centroid.y - 12;
+    const lineHeight = 16;
+
     return (
-      <text
-        x={centroid.x}
-        y={centroid.y - this.radius - 10}
-        textAnchor="middle"
-        fontSize="12"
-        fill="#000"
-        fontWeight="bold"
-      >
-        R: {this.radius.toFixed(1)}px
-      </text>
+      <g>
+        <text
+          x={labelX}
+          y={labelY}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          CenterX: {this.center.x.toFixed(1)}
+        </text>
+        <text
+          x={labelX}
+          y={labelY + lineHeight}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          CenterY: {this.center.y.toFixed(1)}
+        </text>
+        <text
+          x={labelX}
+          y={labelY + lineHeight * 2}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          Radius: {radius} px
+        </text>
+        <text
+          x={labelX}
+          y={labelY + lineHeight * 3}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          Diameter: {diameter} px
+        </text>
+        <text
+          x={labelX}
+          y={labelY + lineHeight * 4}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          Area: {areaValue} px²
+        </text>
+        <text
+          x={labelX}
+          y={labelY + lineHeight * 5}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          Circumference: {circumference} px
+        </text>
+      </g>
     );
   }
 }
@@ -243,17 +353,74 @@ export class Ellipse extends Shape implements Bordered {
 
   renderLabel(metrics: ShapeMetrics): ReactNode {
     const { centroid } = metrics;
+    const area = metrics.area || 0;
+    const radiusX = this.radiusX.toFixed(1);
+    const radiusY = this.radiusY.toFixed(1);
+    const areaValue = area.toFixed(0);
+    const perimeter = (metrics.perimeter ?? 0).toFixed(1);
+
+    const labelX = centroid.x + this.radiusX + 10;
+    const labelY = centroid.y - 18;
+    const lineHeight = 16;
+
     return (
-      <text
-        x={centroid.x}
-        y={centroid.y - this.radiusY - 10}
-        textAnchor="middle"
-        fontSize="12"
-        fill="#000"
-        fontWeight="bold"
-      >
-        {this.radiusX.toFixed(1)}x{this.radiusY.toFixed(1)}px
-      </text>
+      <g>
+        <text
+          x={labelX}
+          y={labelY}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          Centre: ({this.center.x.toFixed(1)}, {this.center.y.toFixed(1)})
+        </text>
+        <text
+          x={labelX}
+          y={labelY + lineHeight}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          Rayon horiz. (a): {radiusX} px
+        </text>
+        <text
+          x={labelX}
+          y={labelY + lineHeight * 2}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          Rayon vert. (b): {radiusY} px
+        </text>
+        <text
+          x={labelX}
+          y={labelY + lineHeight * 3}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          Aire: {areaValue} px²
+        </text>
+        <text
+          x={labelX}
+          y={labelY + lineHeight * 4}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          Périmètre: {perimeter} px
+        </text>
+      </g>
     );
   }
 }
@@ -312,17 +479,85 @@ export class Rectangle extends Shape implements Bordered {
 
   renderLabel(metrics: ShapeMetrics): ReactNode {
     const { centroid } = metrics;
+    const area = metrics.area || 0;
+    const width = Math.abs(this.width).toFixed(1);
+    const height = Math.abs(this.height).toFixed(1);
+    const areaValue = area.toFixed(0);
+    const perimeter = (metrics.perimeter ?? (2 * (Math.abs(this.width) + Math.abs(this.height)))).toFixed(1);
+
+    const labelX = centroid.x + Math.abs(this.width) / 2 + 10;
+    const labelY = centroid.y - Math.abs(this.height) / 2 - 14;
+    const lineHeight = 16;
+
     return (
-      <text
-        x={centroid.x}
-        y={centroid.y}
-        textAnchor="middle"
-        fontSize="12"
-        fill="#000"
-        fontWeight="bold"
-      >
-        {Math.abs(this.width).toFixed(1)}x{Math.abs(this.height).toFixed(1)}px
-      </text>
+      <g>
+        <text
+          x={labelX}
+          y={labelY}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          x: {this.origin.x.toFixed(1)}
+        </text>
+        <text
+          x={labelX}
+          y={labelY + lineHeight}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          y: {this.origin.y.toFixed(1)}
+        </text>
+        <text
+          x={labelX}
+          y={labelY + lineHeight * 2}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          Width: {width} px
+        </text>
+        <text
+          x={labelX}
+          y={labelY + lineHeight * 3}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          Height: {height} px
+        </text>
+        <text
+          x={labelX}
+          y={labelY + lineHeight * 4}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          Area: {areaValue} px²
+        </text>
+        <text
+          x={labelX}
+          y={labelY + lineHeight * 5}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          Perimeter: {perimeter} px
+        </text>
+      </g>
     );
   }
 }
@@ -388,18 +623,85 @@ export class Polygon extends Shape implements Bordered {
   }
 
   renderLabel(metrics: ShapeMetrics): ReactNode {
-    const { centroid } = metrics;
+    const { area, perimeter, boundingBox } = metrics;
+    const areaValue = (area || 0).toFixed(1);
+    const periValue = (perimeter || 0).toFixed(1);
+
+    const box = boundingBox ?? { x: 0, y: 0, width: 0, height: 0 };
+    const labelX = box.x + box.width + 12;
+    const labelY = box.y;
+    const lineHeight = 16;
+
+    const letters = 'abcdefghijklmnopqrstuvwxyz';
+    const pointLines = this.points.map((p, i) => `${letters[i] || (i+1)}: (${p.x.toFixed(1)}, ${p.y.toFixed(1)})`.substring(0, 50));
+
     return (
-      <text
-        x={centroid.x}
-        y={centroid.y}
-        textAnchor="middle"
-        fontSize="24"
-        fill="#000"
-        fontWeight="bold"
-      >
-        {this.points.length} pts
-      </text>
+      <g>
+        <text
+          x={labelX}
+          y={labelY}
+          textAnchor="start"
+          fontSize="14"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          {this.points.length} pts
+        </text>
+
+        {pointLines.map((ln, i) => (
+          <text
+            key={`pt-${i}`}
+            x={labelX}
+            y={labelY + (i + 1) * lineHeight}
+            textAnchor="start"
+            fontSize="12"
+            fill="#00ff00"
+            fontWeight="bold"
+            style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+          >
+            {ln}
+          </text>
+        ))}
+
+        <text
+          x={labelX}
+          y={labelY + (pointLines.length + 1) * lineHeight}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          Aire: {areaValue} px²
+        </text>
+
+        <text
+          x={labelX}
+          y={labelY + (pointLines.length + 2) * lineHeight}
+          textAnchor="start"
+          fontSize="12"
+          fill="#00ff00"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+        >
+          Perim.: {periValue} px
+        </text>
+
+        {boundingBox && (
+          <text
+            x={labelX}
+            y={labelY + (pointLines.length + 3) * lineHeight}
+            textAnchor="start"
+            fontSize="12"
+            fill="#00ff00"
+            fontWeight="bold"
+            style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+          >
+            BBox: ({boundingBox.x.toFixed(1)}, {boundingBox.y.toFixed(1)}) {boundingBox.width.toFixed(1)}x{boundingBox.height.toFixed(1)}
+          </text>
+        )}
+      </g>
     );
   }
 }
@@ -466,7 +768,7 @@ export class Polyline extends Shape implements Bordered {
         y={centroid.y}
         textAnchor="middle"
         fontSize="12"
-        fill="#000"
+        fill="#00ff00"
         fontWeight="bold"
       >
         {this.points.length} pts
