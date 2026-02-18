@@ -3,7 +3,7 @@ import random
 
 from api.controller import Controller
 from api.websocket import WebSocketHandler, WebSocketMessage, websocket_subscribe
-from models.form import Shape, ShapeUnion
+from models.form import Shape, ShapeUnion, Bordered
 
 class DrawAuthor:
     color: str
@@ -83,6 +83,10 @@ class DrawController(Controller, WebSocketHandler):
         
         if author not in session.shapes:
             session.shapes[author] = []
+
+        if isinstance(message.shape, Bordered):
+            message.shape.border_color = author.color
+
         session.shapes[author].append(message.shape)
 
         shapes = []

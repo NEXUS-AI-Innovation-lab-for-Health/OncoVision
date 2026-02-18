@@ -86,7 +86,7 @@ export default function CanvaSocket(props: CanvaSocketProps) {
         setOnConnect(() => {
             bus.publish({
                 type: "handshake",
-                sessionId: "test-session",
+                sessionId: sessionId.current,
             });
         });
 
