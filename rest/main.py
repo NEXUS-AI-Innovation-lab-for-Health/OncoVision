@@ -1,5 +1,7 @@
 import os
 import dotenv
+import tempfile
+from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI
@@ -12,8 +14,11 @@ from database.mongo.connection import MongoConnection, MongoCredentials
 import models as _ # Load models
 
 # Import controllers
-from controllers.image import ImageController
-from controllers.draw import DrawController
+from controllers.viewer import ViewerController
+from controllers.patient import PatientController
+
+# Import startup utilities
+from utils.startup import auto_register_images, create_sample_patients
 
 # Load env. variables
 dotenv.load_dotenv()
@@ -62,7 +67,6 @@ except Exception as e:
     exit(1)
 
 # Initialize s3 storage connection
-# Setup S3 Connection
 s3_credentials = S3Credentials(
     host=os.getenv("S3_HOST", "http://localhost"),
     port=int(os.getenv("S3_PORT", 9000)),
@@ -79,29 +83,48 @@ except Exception as e:
     print(f"Failed to establish S3 connection: {e}")
     exit(1)
 
-# Initialize MongoDB connection
-mongo_credentials = MongoCredentials(
-    host=os.getenv("MONGO_HOST", "localhost"),
-    port=int(os.getenv("MONGO_PORT", 27017)),
-    user=os.getenv("MONGO_USER", "user"),
-    password=os.getenv("MONGO_PASSWORD", "password"),
-    database=os.getenv("MONGO_DATABASE", "database"),
-)
-mongo_connection = None
-try:
-    mongo_connection = MongoConnection(mongo_credentials)
-    if mongo_connection.ping():
-        print("MongoDB connection established successfully.")
-    else:
-        raise Exception("Ping to MongoDB server failed.")
-except Exception as e:
-    print(f"Failed to establish MongoDB connection: {e}")
-    exit(1)
+# Exemple de fonction upload_image modifiée (à placer dans controllers/viewer.py)
+def upload_image(content):
+    try:
+        # Utilise tempfile pour créer un fichier temporaire valide
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".svs") as temp_file:
+            temp_path = Path(temp_file.name)
+            temp_path.write_bytes(content)
+        print(f"Fichier temporaire créé : {temp_path}")
+        return temp_path
+    except Exception as e:
+        print(f"Erreur lors de l'écriture du fichier temporaire : {e}")
+        raise
 
 routers = [
     ImageController(s3_connection, mongo_connection),
     DrawController(mongo_connection),
 ]
+
+# Initialize PatientController
+patient_controller = PatientController()
+routers.append(patient_controller)
+
+# Auto-register images from the images directory at startup
+images_dir = Path(__file__).parent.parent / "images"
+print(f"\n[startup] Auto-registering images from: {images_dir}")
+
+# Get ViewerController reference before it might move in the list
+viewer_controller = routers[0]
+image_map = auto_register_images(viewer_controller.registry, images_dir, debug=True)
+
+if image_map:
+    print(f"\n[startup] Successfully registered {len(image_map)} images:")
+    for filename, image_id in image_map.items():
+        print(f"  - {filename} → {image_id}")
+else:
+    print(f"[startup] No images registered from {images_dir}")
+
+# Create sample patients with the registered image IDs
+patients = create_sample_patients(image_map)
+patient_controller.set_patients(patients)
+print(f"\n[startup] Created {len(patients)} patients with valid image IDs")
+
 for router in routers:
     app.include_router(router)
     # Register WebSocket routes directly on app (APIRouter has issues with WebSockets)

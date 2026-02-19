@@ -1,15 +1,18 @@
 import { Button, Input, Divider } from "antd";
 import { useEffect, useState } from "react";
-import { FaUpload } from "react-icons/fa";
 import { useRest } from "../../hooks/rest";
 import ImageViewer from "../viewers/image";
-import CanvaSocket from "../viewers/socket/canva";
+import { PatientSelector } from "../PatientSelector";
+import { usePatients } from "../../hooks/usePatients";
 
 export default function ImageUploader() {
 
     const [file, setFile] = useState<File | null>(null);
     const [previewId, setPreviewId] = useState<string>("");
     const [responseId, setResponseId] = useState<string>("");
+    const [selectedPatientId, setSelectedPatientId] = useState<string>("");
+
+    const { data: patients } = usePatients();
 
     const { useQuery, post } = useRest();
     const { data, refetch } = useQuery<any>({
@@ -34,6 +37,15 @@ export default function ImageUploader() {
         }
     }, [data]);
 
+    useEffect(() => {
+        if (selectedPatientId && patients) {
+            const patient = patients.find(p => p.id === selectedPatientId);
+            if (patient && patient.imageId) {
+                setPreviewId(patient.imageId);
+            }
+        }
+    }, [selectedPatientId, patients]);
+
     const upload = async () => {
         console.log("Uploading file...");
         await refetch();
@@ -49,6 +61,13 @@ export default function ImageUploader() {
 
     return (
         <div>
+            <div style={{ marginBottom: 16 }}>
+                <PatientSelector
+                    value={selectedPatientId}
+                    onChange={setSelectedPatientId}
+                    placeholder="Sélectionner un patient"
+                />
+            </div>
             <input
                 type="file"
                 accept=".tiff,.dcnm,.dcm,.svs,.dzi"
@@ -57,13 +76,6 @@ export default function ImageUploader() {
             />
             {!file ? (
                 <div>
-                    <p className="ant-upload-drag-icon">
-                        <FaUpload />
-                    </p>
-                    <p className="ant-upload-text">Select a file to upload</p>
-                    <p className="ant-upload-hint">
-                        Support for .tiff, .dicom, .svs, .dzi files.
-                    </p>
                 </div>
             ) : (
                 <div>

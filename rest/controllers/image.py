@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 from uuid import uuid4
 import time
@@ -58,31 +59,14 @@ class ImageController(Controller):
                 raise HTTPException(status_code=400, detail="Could not detect image format from filename. Please specify 'kind' explicitly.")
             kind = detected
 
-        # Save temporarily to process
-        temp_path = Path(f"/tmp/{uuid4().hex}_{filename}")
+        # Lire le contenu du fichier
         content = await file.read()
-        temp_path.write_bytes(content)
-        extracted_dir: Path | None = None
-        source_path = temp_path
 
+        # Utiliser tempfile pour créer un fichier temporaire valide
         try:
-            if kind == "DEEPZOOM":
-                suffix = temp_path.suffix.lower()
-                if suffix == ".zip":
-                    extracted_dir = Path(f"/tmp/{uuid4().hex}_dzi")
-                    extracted_dir.mkdir(parents=True, exist_ok=True)
-                    with zipfile.ZipFile(temp_path, "r") as zf:
-                        zf.extractall(extracted_dir)
-                    dzi_candidates = list(extracted_dir.rglob("*.dzi"))
-                    if not dzi_candidates:
-                        raise ValueError("Archive .zip sans fichier .dzi")
-                    source_path = dzi_candidates[0]
-                elif suffix == ".dzi":
-                    tiles_dir = temp_path.parent / f"{temp_path.stem}_files"
-                    if not tiles_dir.exists():
-                        raise ValueError(
-                            "DZI sans tuiles. Uploadez un .zip contenant .dzi + _files."
-                        )
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".svs") as temp_file:
+                temp_path = Path(temp_file.name)
+                temp_path.write_bytes(content)
 
             # Register and upload levels to S3
             print(f"Uploading image {filename} as kind {kind}...")
@@ -91,8 +75,7 @@ class ImageController(Controller):
             elapsed = time.perf_counter() - started
             print(f"Image {filename} uploaded with id {record.id} in {elapsed:.2f}s")
 
-            # For info, we need to get dimensions - we'll need to modify registry to store this
-            # For now, return basic info
+            # Retourner les informations de l'image
             return {
                 "id": record.id,
                 "kind": record.kind,
@@ -105,11 +88,13 @@ class ImageController(Controller):
             import traceback
             traceback.print_exc()
             raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            print(f"Erreur lors du traitement du fichier : {e}")
+            raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
         finally:
-            # Clean up temp file
-            temp_path.unlink(missing_ok=True)
-            if extracted_dir:
-                shutil.rmtree(extracted_dir, ignore_errors=True)
+            # Nettoyer le fichier temporaire
+            if 'temp_path' in locals():
+                temp_path.unlink(missing_ok=True)
 
     def get_info(self, image_id: str):
         record = self._get_record(image_id)

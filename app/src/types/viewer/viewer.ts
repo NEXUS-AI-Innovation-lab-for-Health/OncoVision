@@ -12,3 +12,4 @@ export interface UniversalViewerProps {
 	onReady?: () => void;
 	onError?: (error: Error) => void;
 }
+

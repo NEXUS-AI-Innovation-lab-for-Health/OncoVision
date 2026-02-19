@@ -1,0 +1,126 @@
+import { Card, Descriptions, Button, Tag, Divider } from "antd";
+import { useNavigate, useParams } from "react-router-dom";
+import { usePatients } from "../hooks/usePatients";
+import { getStatusColor } from "../utils/patient";
+import ImageViewer from "./viewers/image";
+import { useState, useEffect } from "react";
+
+export function PatientDetail() {
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const { data: patients } = usePatients();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const patient = patients?.find((p) => p.id === id);
+
+  if (!patient) {
+    return (
+      <div style={{ padding: isMobile ? "12px" : "24px", minHeight: "100vh", background: "#f0f2f5" }}>
+        <Card>
+          <p>Patient non trouvé</p>
+          <Button onClick={() => navigate("/")}>Retour à la liste</Button>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ 
+      padding: isMobile ? "12px" : "24px", 
+      minHeight: "100vh", 
+      background: "#f0f2f5" 
+    }}>
+      <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+        <Button 
+          onClick={() => navigate("/")} 
+          style={{ marginBottom: isMobile ? 12 : 16 }}
+          size={isMobile ? "middle" : "large"}
+        >
+          ← Retour à la liste
+        </Button>
+        
+        <Card
+          title={
+            <h2 style={{ 
+              margin: 0, 
+              fontSize: isMobile ? 16 : 24,
+              wordBreak: 'break-word'
+            }}>
+              Dossier Patient: {patient.name}
+            </h2>
+          }
+          extra={
+            <Tag color={getStatusColor(patient.status)} style={{ fontSize: isMobile ? 12 : 14 }}>
+              {patient.status}
+            </Tag>
+          }
+        >
+          <Descriptions bordered column={isMobile ? 1 : 2} size={isMobile ? "small" : "default"}>
+            <Descriptions.Item label="Nom">{patient.name}</Descriptions.Item>
+            <Descriptions.Item label="Âge">{patient.age} ans</Descriptions.Item>
+            <Descriptions.Item label="Genre">{patient.gender}</Descriptions.Item>
+            <Descriptions.Item label="Date de naissance">
+              {patient.dateOfBirth ? new Date(patient.dateOfBirth).toLocaleDateString('fr-FR') : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Diagnostic" span={isMobile ? 1 : 2}>
+              {patient.diagnosis}
+            </Descriptions.Item>
+            <Descriptions.Item label="Dernière visite">
+              {patient.lastVisit ? new Date(patient.lastVisit).toLocaleDateString('fr-FR') : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="ID Image">
+              {patient.imageId || "Non disponible"}
+            </Descriptions.Item>
+            <Descriptions.Item label="Historique médical" span={isMobile ? 1 : 2}>
+              {patient.medicalHistory || "Aucun historique disponible"}
+            </Descriptions.Item>
+          </Descriptions>
+
+          {patient.imageId && (
+            <>
+              <Divider>Imagerie Médicale</Divider>
+              <div style={{ 
+                width: '100%', 
+                height: isMobile ? '400px' : '600px', 
+                border: '1px solid #d9d9d9', 
+                borderRadius: 8, 
+                overflow: 'hidden' 
+              }}>
+                <ImageViewer imageId={patient.imageId} />
+              </div>
+            </>
+          )}
+
+          {!patient.imageId && (
+            <>
+              <Divider>Imagerie Médicale</Divider>
+              <div style={{ 
+                width: '100%', 
+                height: isMobile ? '200px' : '400px', 
+                border: '2px dashed #d9d9d9', 
+                borderRadius: 8, 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                color: '#999',
+                textAlign: 'center',
+                padding: '16px'
+              }}>
+                <p>Aucune image disponible pour ce patient</p>
+              </div>
+            </>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
