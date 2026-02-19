@@ -14,6 +14,7 @@ class MongoConnection:
             password=credentials.password,
             authSource="admin",
         )
+        self.database = credentials.database
     
     def ping(self) -> bool:
         try:
@@ -22,7 +23,9 @@ class MongoConnection:
         except Exception:
             return False
 
-    def get_database(self, db_name: str):
+    def get_database(self, db_name: str | None = None):
+        if db_name is None:
+            db_name = self.database
         return self.client[db_name]
     
     def close(self) -> None:

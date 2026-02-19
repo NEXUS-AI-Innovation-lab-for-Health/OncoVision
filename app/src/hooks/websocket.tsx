@@ -38,8 +38,6 @@ export const useWebSocket = (props: UseWebSocketType): UseWebSocketReturn => {
     const [isConnected, setIsConnected] = useState<boolean>(false);
 
     const [queue, setQueue] = useState<(object | string)[]>([]);
-    const [listeners, setListeners] = useState<Record<string, SocketMessageListener>>({});
-
     const onConnectRef = useRef<SocketConnectListener | undefined>(undefined);
     const onDisconnectRef = useRef<SocketDisconnectListener | undefined>(undefined);
 
@@ -47,13 +45,9 @@ export const useWebSocket = (props: UseWebSocketType): UseWebSocketReturn => {
     const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const connectionAttemptRef = useRef<boolean>(false);
 
-    const listenersRef = useRef(listeners);
+    const listenersRef = useRef<Record<string, SocketMessageListener>>({});
     const queueRef = useRef(queue);
     const autoConnectRef = useRef(autoConnect);
-
-    useEffect(() => {
-        listenersRef.current = listeners;
-    }, [listeners]);
 
     useEffect(() => {
         queueRef.current = queue;
@@ -195,20 +189,16 @@ export const useWebSocket = (props: UseWebSocketType): UseWebSocketReturn => {
     }, [disconnect]);
 
     const registerListener = useCallback((id: string, listener: SocketMessageListener) => {
-        setListeners((prev) => {
-            const next = { ...prev, [id]: listener };
-            listenersRef.current = next;
-            return next;
-        });
+        listenersRef.current = {
+            ...listenersRef.current,
+            [id]: listener,
+        };
     }, []);
 
     const unregisterListener = useCallback((id: string) => {
-        setListeners((prev) => {
-            const newListeners = { ...prev };
-            delete newListeners[id];
-            listenersRef.current = newListeners;
-            return newListeners;
-        });
+        const next = { ...listenersRef.current };
+        delete next[id];
+        listenersRef.current = next;
     }, []);
 
     const setOnConnect = useCallback((listener: SocketConnectListener | undefined) => {

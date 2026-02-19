@@ -16,4 +16,6 @@ COPY --from=builder /app /app
 
 WORKDIR /app
 
-CMD ["npm", "run", "start"]
+RUN chmod +x /app/entrypoint.sh
+
+CMD ["/app/entrypoint.sh"]

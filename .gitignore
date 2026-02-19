@@ -66,3 +66,9 @@ app/expo-env.d.ts
 
 # SAE files #
 /images
+
+# Workflow repo
+/workflows
+
+# Env files
+.env

@@ -37,10 +37,11 @@ export class WebSocketBus {
             if (event.code === 1001) { // Going away, likely due to page refresh or navigation. Ignore this disconnect.
                 return;
             }
-            this.clean();
         });
         this.socket.connect();
         return () => {
+            this.socket.setOnDisconnect(undefined);
+            this.socket.unregisterListener("websocket_bus");
             this.socket.disconnect();
         }
     }
