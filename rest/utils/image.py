@@ -4,8 +4,6 @@ from io import BytesIO
 from pathlib import Path
 from typing import IO, Union, Literal
 import numpy as np
-import pydicom
-from pydicom.uid import ImplicitVRLittleEndian
 import openslide
 import tifffile
 import math
@@ -99,6 +97,8 @@ def load_tiff_as_pillow(path: Path) -> Image.Image:
 	return img
 
 def load_dicom_as_pillow(path: Path) -> Image.Image:
+	import pydicom
+	from pydicom.uid import ImplicitVRLittleEndian
 	ds = pydicom.dcmread(str(path), force=True)
 	# Fallback: certains fichiers n'ont pas de Transfer Syntax UID.
 	if not getattr(ds, "file_meta", None):
