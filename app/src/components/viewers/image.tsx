@@ -98,6 +98,7 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
     const [isMobile, setIsMobile] = useState(false);
     const [isToolbarMinimized, setIsToolbarMinimized] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [showLabels, setShowLabels] = useState(true);
     
     // Touch support refs
     const lastTouchDistance = useRef<number | null>(null);
@@ -860,6 +861,39 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                     >
                         {!isMobile && <span style={{ marginLeft: 4 }}>Effac.</span>}
                     </Button>
+
+                    <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.06)', margin: isMobile ? '4px 0' : '5px 0' }} />
+
+                    <Button
+                        type={showLabels ? 'primary' : 'text'}
+                        size="small"
+                        onClick={() => setShowLabels(!showLabels)}
+                        style={showLabels ? { 
+                            background: '#1366FF', 
+                            color: '#FFF', 
+                            borderRadius: 6, 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            padding: isMobile ? '6px 0' : '4px 6px',
+                            width: '100%',
+                            fontSize: 11
+                        } : { 
+                            color: '#E9EEF5', 
+                            background: 'transparent', 
+                            border: '1px solid rgba(255,255,255,0.02)', 
+                            borderRadius: 6, 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            padding: isMobile ? '6px 0' : '4px 6px',
+                            width: '100%',
+                            fontSize: 11
+                        }}
+                    >
+                        {!isMobile && <span>{showLabels ? '📊 Dim.' : '○ Dim.'}</span>}
+                        {isMobile && <span>{showLabels ? '📊' : '○'}</span>}
+                    </Button>
                 </div>
             </div>
             )}
@@ -893,6 +927,7 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                 onDrawingActiveChange={setIsDrawingActive}
                 imageWidth={info.width}
                 imageHeight={info.height}
+                showLabels={showLabels}
             />
         </div>
     );

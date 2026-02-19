@@ -33,6 +33,7 @@ interface CanvaProps {
     onDrawingActiveChange?: (active: boolean) => void;
     imageWidth?: number;
     imageHeight?: number;
+    showLabels?: boolean;
 }
 
 export interface CanvaHandle {
@@ -52,6 +53,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     onDrawingActiveChange,
     imageWidth,
     imageHeight,
+    showLabels = true,
 }: CanvaProps, ref) {
     const [internalTool] = useState<CanvaTool>("pan");
     const resolvedTool = activeTool ?? internalTool;
@@ -240,7 +242,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                         {shapes.map(({ shape, metrics }, idx) => (
                             <g key={`shape-${idx}`}>
                                 {shape.render()}
-                                {shape.renderLabel?.(metrics)}
+                                {showLabels && shape.renderLabel?.(metrics)}
                             </g>
                         ))}
                         {previewShape && <g opacity={0.7}>{previewShape.render()}</g>}
