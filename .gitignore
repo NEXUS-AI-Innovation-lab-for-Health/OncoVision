@@ -66,6 +66,7 @@ app/expo-env.d.ts
 
 # SAE files #
 /images
+sync.sh
 
 # Workflow repo
 /workflows
