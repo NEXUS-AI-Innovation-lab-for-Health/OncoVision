@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Slider, Button, Tooltip } from "antd";
+import { Slider, Button, Tooltip, Popover, InputNumber, Select, Space } from "antd";
 import { FiZoomIn, FiZoomOut, FiMaximize2, FiMinimize2, FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { useRest } from "../../hooks/rest";
 import ImagePreview from "./preview"; // New import
@@ -59,6 +59,13 @@ const ToolIcon = ({ name, size = 14 }: { name: string; size?: number }) => {
                     <path d="M3 6h18M8 6v14a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V6" />
                 </svg>
             );
+        case 'gear':
+            return (
+                <svg {...common} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                    <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09c.7 0 1.24-.45 1.51-1a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06c.5.5 1.25.64 1.82.33.47-.26 1-.41 1.51-.41H11a2 2 0 0 1 4 0h.09c.51 0 1.04.15 1.51.41.57.31 1.32.17 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06c-.26.47-.41 1-.41 1.51V11a2 2 0 0 1 0 4h-.09c-.7 0-1.24.45-1.51 1z" />
+                </svg>
+            );
         case 'hide-dimensions':
             return (
                 <svg {...common} viewBox="0 -960 960 960" fill="currentColor">
@@ -105,6 +112,8 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
     const [isToolbarMinimized, setIsToolbarMinimized] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [showLabels, setShowLabels] = useState(true);
+    const [scaleFactor, setScaleFactor] = useState<number>(1); // units per pixel
+    const [scaleUnit, setScaleUnit] = useState<string>('px');
     
     // Touch support refs
     const lastTouchDistance = useRef<number | null>(null);
@@ -870,36 +879,78 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
 
                     <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.06)', margin: isMobile ? '4px 0' : '5px 0' }} />
 
-                    <Button
-                        type={showLabels ? 'primary' : 'text'}
-                        size="small"
-                        icon={<ToolIcon name="hide-dimensions" size={isMobile ? 14 : 11} />}
-                        onClick={() => setShowLabels(!showLabels)}
-                        style={showLabels ? { 
-                            background: '#1366FF', 
-                            color: '#FFF', 
-                            borderRadius: 6, 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center', 
-                            padding: isMobile ? '6px 0' : '4px 6px',
-                            width: '100%',
-                            fontSize: 11
-                        } : { 
-                            color: '#E9EEF5', 
-                            background: 'transparent', 
-                            border: '1px solid rgba(255,255,255,0.02)', 
-                            borderRadius: 6, 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center', 
-                            padding: isMobile ? '6px 0' : '4px 6px',
-                            width: '100%',
-                            fontSize: 11
-                        }}
-                    >
-                        {!isMobile && <span style={{ marginLeft: 4 }}>Dim.</span>}
-                    </Button>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <Button
+                            type={showLabels ? 'primary' : 'text'}
+                            size="small"
+                            icon={<ToolIcon name="hide-dimensions" size={isMobile ? 14 : 11} />}
+                            onClick={() => setShowLabels(!showLabels)}
+                            style={showLabels ? { 
+                                background: '#1366FF', 
+                                color: '#FFF', 
+                                borderRadius: 6, 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                padding: isMobile ? '6px 0' : '4px 6px',
+                                width: '100%',
+                                fontSize: 11
+                            } : { 
+                                color: '#E9EEF5', 
+                                background: 'transparent', 
+                                border: '1px solid rgba(255,255,255,0.02)', 
+                                borderRadius: 6, 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                padding: isMobile ? '6px 0' : '4px 6px',
+                                width: '100%',
+                                fontSize: 11
+                            }}
+                        >
+                            {!isMobile && <span style={{ marginLeft: 4 }}>Dim.</span>}
+                        </Button>
+
+                        <Popover
+                            placement="right"
+                            trigger="click"
+                            content={
+                                <div style={{ width: 220 }}>
+                                    <Space direction="vertical" style={{ width: '100%' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <span style={{ color: '#E9EEF5' }}>1 px =</span>
+                                            <InputNumber
+                                                min={0}
+                                                step={0.000001}
+                                                value={scaleFactor}
+                                                onChange={(v) => setScaleFactor(Number(v) || 1)}
+                                                style={{ width: 110 }}
+                                            />
+                                            <Select
+                                                value={scaleUnit}
+                                                onChange={(v) => setScaleUnit(String(v))}
+                                                options={[
+                                                    { value: 'px', label: 'px' },
+                                                    { value: 'nm', label: 'nm' },
+                                                    { value: 'µm', label: 'µm' },
+                                                    { value: 'mm', label: 'mm' },
+                                                ]}
+                                                style={{ width: 70 }}
+                                            />
+                                        </div>
+                                        <div style={{ fontSize: 12, color: '#BFC7D6' }}>Valeur d'un pixel en unité choisie</div>
+                                    </Space>
+                                </div>
+                            }
+                        >
+                            <Button
+                                type="text"
+                                size="small"
+                                icon={<ToolIcon name="gear" size={isMobile ? 14 : 11} />}
+                                style={{ color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 6, padding: isMobile ? '6px 0' : '4px 6px' }}
+                            />
+                        </Popover>
+                    </div>
                 </div>
             </div>
             )}
@@ -934,6 +985,8 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                 imageWidth={info.width}
                 imageHeight={info.height}
                 showLabels={showLabels}
+                scaleFactor={scaleFactor}
+                scaleUnit={scaleUnit}
             />
         </div>
     );

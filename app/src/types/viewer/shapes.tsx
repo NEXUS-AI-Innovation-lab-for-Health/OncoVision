@@ -17,7 +17,7 @@ export abstract class Shape {
 
   abstract getMetrics(): ShapeMetrics;
 
-  abstract renderLabel(metrics: ShapeMetrics): ReactNode;
+  abstract renderLabel(metrics: ShapeMetrics, scale?: { factor: number; unit: string }): ReactNode;
 
   get getType(): string {
     return this.type;
@@ -106,11 +106,12 @@ export class Line extends Shape implements Bordered {
     );
   }
 
-  renderLabel(metrics: ShapeMetrics): ReactNode {
+  renderLabel(metrics: ShapeMetrics, scale?: { factor: number; unit: string }): ReactNode {
     const { length } = metrics;
     const lengthPx = length ?? 0;
-    const PX_TO_MM = 25.4 / 96;
-    const lengthMm = lengthPx * PX_TO_MM;
+    const factor = scale?.factor ?? 1;
+    const unit = scale?.unit ?? 'px';
+    const lengthConverted = unit === 'px' ? lengthPx : lengthPx * factor;
 
     const dx = this.end.x - this.start.x;
     const dy = this.end.y - this.start.y;
@@ -158,7 +159,7 @@ export class Line extends Shape implements Bordered {
           fontWeight="bold"
           style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
         >
-          {lengthMm.toFixed(1)} mm
+          {lengthConverted.toFixed(1)} {unit}
         </text>
       </g>
     );
@@ -211,13 +212,18 @@ export class Circle extends Shape implements Bordered {
     );
   }
 
-  renderLabel(metrics: ShapeMetrics): ReactNode {
+  renderLabel(metrics: ShapeMetrics, scale?: { factor: number; unit: string }): ReactNode {
     const { centroid } = metrics;
+    const factor = scale?.factor ?? 1;
+    const unit = scale?.unit ?? 'px';
     const area = metrics.area || 0;
-    const diameter = (this.radius * 2).toFixed(1);
-    const circumference = (metrics.perimeter ?? (2 * Math.PI * this.radius)).toFixed(1);
-    const radius = this.radius.toFixed(1);
-    const areaValue = area.toFixed(0);
+    const diameterPx = this.radius * 2;
+    const circumferencePx = metrics.perimeter ?? (2 * Math.PI * this.radius);
+    const radiusPx = this.radius;
+    const diameter = unit === 'px' ? diameterPx : diameterPx * factor;
+    const circumference = unit === 'px' ? circumferencePx : circumferencePx * factor;
+    const radius = unit === 'px' ? radiusPx : radiusPx * factor;
+    const areaValue = unit === 'px' ? area : area * factor * factor;
 
     const labelX = centroid.x + this.radius + 10;
     const labelY = centroid.y - 12;
@@ -256,7 +262,7 @@ export class Circle extends Shape implements Bordered {
           fontWeight="bold"
           style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
         >
-          Radius: {radius} px
+          Radius: {radius.toFixed(1)} {unit}
         </text>
         <text
           x={labelX}
@@ -267,7 +273,7 @@ export class Circle extends Shape implements Bordered {
           fontWeight="bold"
           style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
         >
-          Diameter: {diameter} px
+          Diameter: {diameter.toFixed(1)} {unit}
         </text>
         <text
           x={labelX}
@@ -278,7 +284,7 @@ export class Circle extends Shape implements Bordered {
           fontWeight="bold"
           style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
         >
-          Area: {areaValue} px²
+          Area: {Math.round(areaValue)} {unit}²
         </text>
         <text
           x={labelX}
@@ -289,7 +295,7 @@ export class Circle extends Shape implements Bordered {
           fontWeight="bold"
           style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
         >
-          Circumference: {circumference} px
+          Circumference: {circumference.toFixed(1)} {unit}
         </text>
       </g>
     );
@@ -351,13 +357,17 @@ export class Ellipse extends Shape implements Bordered {
     );
   }
 
-  renderLabel(metrics: ShapeMetrics): ReactNode {
+  renderLabel(metrics: ShapeMetrics, scale?: { factor: number; unit: string }): ReactNode {
     const { centroid } = metrics;
+    const factor = scale?.factor ?? 1;
+    const unit = scale?.unit ?? 'px';
     const area = metrics.area || 0;
-    const radiusX = this.radiusX.toFixed(1);
-    const radiusY = this.radiusY.toFixed(1);
-    const areaValue = area.toFixed(0);
-    const perimeter = (metrics.perimeter ?? 0).toFixed(1);
+    const radiusXpx = this.radiusX;
+    const radiusYpx = this.radiusY;
+    const radiusX = unit === 'px' ? radiusXpx : radiusXpx * factor;
+    const radiusY = unit === 'px' ? radiusYpx : radiusYpx * factor;
+    const areaValue = unit === 'px' ? area : area * factor * factor;
+    const perimeter = unit === 'px' ? (metrics.perimeter ?? 0) : (metrics.perimeter ?? 0) * factor;
 
     const labelX = centroid.x + this.radiusX + 10;
     const labelY = centroid.y - 18;
@@ -385,7 +395,7 @@ export class Ellipse extends Shape implements Bordered {
           fontWeight="bold"
           style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
         >
-          Rayon horiz. (a): {radiusX} px
+          Rayon horiz. (a): {radiusX.toFixed(1)} {unit}
         </text>
         <text
           x={labelX}
@@ -396,7 +406,7 @@ export class Ellipse extends Shape implements Bordered {
           fontWeight="bold"
           style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
         >
-          Rayon vert. (b): {radiusY} px
+          Rayon vert. (b): {radiusY.toFixed(1)} {unit}
         </text>
         <text
           x={labelX}
@@ -407,7 +417,7 @@ export class Ellipse extends Shape implements Bordered {
           fontWeight="bold"
           style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
         >
-          Aire: {areaValue} px²
+          Aire: {Math.round(areaValue)} {unit}²
         </text>
         <text
           x={labelX}
@@ -418,7 +428,7 @@ export class Ellipse extends Shape implements Bordered {
           fontWeight="bold"
           style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
         >
-          Périmètre: {perimeter} px
+          Périmètre: {perimeter.toFixed(1)} {unit}
         </text>
       </g>
     );
@@ -477,13 +487,17 @@ export class Rectangle extends Shape implements Bordered {
     );
   }
 
-  renderLabel(metrics: ShapeMetrics): ReactNode {
+  renderLabel(metrics: ShapeMetrics, scale?: { factor: number; unit: string }): ReactNode {
     const { centroid } = metrics;
+    const factor = scale?.factor ?? 1;
+    const unit = scale?.unit ?? 'px';
     const area = metrics.area || 0;
-    const width = Math.abs(this.width).toFixed(1);
-    const height = Math.abs(this.height).toFixed(1);
-    const areaValue = area.toFixed(0);
-    const perimeter = (metrics.perimeter ?? (2 * (Math.abs(this.width) + Math.abs(this.height)))).toFixed(1);
+    const widthPx = Math.abs(this.width);
+    const heightPx = Math.abs(this.height);
+    const width = unit === 'px' ? widthPx : widthPx * factor;
+    const height = unit === 'px' ? heightPx : heightPx * factor;
+    const areaValue = unit === 'px' ? area : area * factor * factor;
+    const perimeter = unit === 'px' ? (metrics.perimeter ?? (2 * (widthPx + heightPx))) : (metrics.perimeter ?? (2 * (widthPx + heightPx))) * factor;
 
     const labelX = centroid.x + Math.abs(this.width) / 2 + 10;
     const labelY = centroid.y - Math.abs(this.height) / 2 - 14;
@@ -522,7 +536,7 @@ export class Rectangle extends Shape implements Bordered {
           fontWeight="bold"
           style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
         >
-          Width: {width} px
+          Width: {width.toFixed(1)} {unit}
         </text>
         <text
           x={labelX}
@@ -533,7 +547,7 @@ export class Rectangle extends Shape implements Bordered {
           fontWeight="bold"
           style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
         >
-          Height: {height} px
+          Height: {height.toFixed(1)} {unit}
         </text>
         <text
           x={labelX}
@@ -544,7 +558,7 @@ export class Rectangle extends Shape implements Bordered {
           fontWeight="bold"
           style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
         >
-          Area: {areaValue} px²
+          Area: {Math.round(areaValue)} {unit}²
         </text>
         <text
           x={labelX}
@@ -555,7 +569,7 @@ export class Rectangle extends Shape implements Bordered {
           fontWeight="bold"
           style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
         >
-          Perimeter: {perimeter} px
+          Perimeter: {perimeter.toFixed(1)} {unit}
         </text>
       </g>
     );
@@ -622,10 +636,14 @@ export class Polygon extends Shape implements Bordered {
     return <polygon points={pointsStr} stroke={this.borderColor} strokeWidth={this.borderWidth} fill="none" />;
   }
 
-  renderLabel(metrics: ShapeMetrics): ReactNode {
+  renderLabel(metrics: ShapeMetrics, scale?: { factor: number; unit: string }): ReactNode {
     const { area, perimeter, boundingBox } = metrics;
-    const areaValue = (area || 0).toFixed(1);
-    const periValue = (perimeter || 0).toFixed(1);
+    const factor = scale?.factor ?? 1;
+    const unit = scale?.unit ?? 'px';
+    const areaValueRaw = area || 0;
+    const periValueRaw = perimeter || 0;
+    const areaValue = unit === 'px' ? areaValueRaw : areaValueRaw * factor * factor;
+    const periValue = unit === 'px' ? periValueRaw : periValueRaw * factor;
 
     const box = boundingBox ?? { x: 0, y: 0, width: 0, height: 0 };
     const labelX = box.x + box.width + 12;
@@ -673,7 +691,7 @@ export class Polygon extends Shape implements Bordered {
           fontWeight="bold"
           style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
         >
-          Aire: {areaValue} px²
+          Aire: {Math.round(areaValue)} {unit}²
         </text>
 
         <text
@@ -685,7 +703,7 @@ export class Polygon extends Shape implements Bordered {
           fontWeight="bold"
           style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
         >
-          Perim.: {periValue} px
+          Perim.: {periValue.toFixed(1)} {unit}
         </text>
 
         {boundingBox && (
@@ -760,7 +778,7 @@ export class Polyline extends Shape implements Bordered {
     return <polyline points={pointsStr} stroke={this.borderColor} strokeWidth={this.borderWidth} fill="none" />;
   }
 
-  renderLabel(metrics: ShapeMetrics): ReactNode {
+  renderLabel(metrics: ShapeMetrics, scale?: { factor: number; unit: string }): ReactNode {
     const { centroid } = metrics;
     return (
       <text

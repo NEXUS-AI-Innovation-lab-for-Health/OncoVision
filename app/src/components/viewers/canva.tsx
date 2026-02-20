@@ -34,6 +34,8 @@ interface CanvaProps {
     imageWidth?: number;
     imageHeight?: number;
     showLabels?: boolean;
+    scaleFactor?: number; // units per pixel
+    scaleUnit?: string;
 }
 
 export interface CanvaHandle {
@@ -54,6 +56,8 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     imageWidth,
     imageHeight,
     showLabels = true,
+    scaleFactor = 1,
+    scaleUnit = 'px',
 }: CanvaProps, ref) {
     const [internalTool] = useState<CanvaTool>("pan");
     const resolvedTool = activeTool ?? internalTool;
@@ -242,7 +246,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                         {shapes.map(({ shape, metrics }, idx) => (
                             <g key={`shape-${idx}`}>
                                 {shape.render()}
-                                {showLabels && shape.renderLabel?.(metrics)}
+                                {showLabels && shape.renderLabel?.(metrics, { factor: scaleFactor, unit: scaleUnit })}
                             </g>
                         ))}
                         {previewShape && <g opacity={0.7}>{previewShape.render()}</g>}
