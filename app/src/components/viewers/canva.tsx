@@ -120,6 +120,8 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     useImperativeHandle(ref, () => ({ addShape, clear }), [addShape, clear]);
 
     const toImagePoint = (e: React.PointerEvent<SVGSVGElement>): Point => {
+        // Convertit un événement pointer (coordonnées écran) en coordonnées image
+        // Prend en compte la taille du SVG, le centre courant (`viewState`) et le zoom.
         const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
@@ -132,11 +134,13 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     };
 
     const isPointInImage = (p: Point) => {
+        // Vérifie si un point (en coords image) est à l'intérieur des limites connues
         if (typeof imageWidth !== 'number' || typeof imageHeight !== 'number') return true;
         return p.x >= 0 && p.x <= imageWidth && p.y >= 0 && p.y <= imageHeight;
     };
 
     const clampPointToImage = (p: Point): Point => {
+        // Contraint un point pour rester dans la zone image
         if (typeof imageWidth !== 'number' || typeof imageHeight !== 'number') return p;
         return {
             x: Math.max(0, Math.min(imageWidth, p.x)),
@@ -145,6 +149,8 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     };
 
     const commitShapeIfReady = (force?: boolean) => {
+        // Termine le dessin courant si le curseur indique qu'il y a une forme complète
+        // `force` est utilisé par le double-clic (polygon close)
         if (!cursorRef.current) return;
         const shape = cursorRef.current.finish(force);
         if (shape) {
@@ -152,11 +158,14 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
             setPreviewShape(null);
             setIsDrawing(false);
         } else {
+            // Met à jour l'aperçu si la forme n'est pas encore complète
             setPreviewShape(cursorRef.current.createPreview());
         }
     };
 
     const handlePointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+        // Début d'interaction pour les outils de dessin : capture du pointer
+        // Convertit la position en coordonnées image et démarre le curseur
         if (resolvedTool === "pan" || !cursorRef.current) return;
         e.stopPropagation();
 
@@ -171,6 +180,8 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     };
 
     const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+        // Pendant le mouvement, on met à jour le curseur si on dessine
+        // Sinon on ajuste l'apparence du curseur (crosshair / not-allowed)
         if (!isDrawing || !cursorRef.current) {
             if (resolvedTool !== "pan") {
                 const pt = toImagePoint(e);
@@ -188,6 +199,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     };
 
     const handlePointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
+        // Fin d'interaction : relâche le pointer et essaye de finaliser la forme
         if (!isDrawing || !cursorRef.current) return;
         const point = toImagePoint(e);
         const clamped = clampPointToImage(point);
@@ -210,6 +222,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     };
 
     const handleDoubleClick = (e: React.MouseEvent<SVGSVGElement>) => {
+        // Double-clic ferme un polygone en cours (force = true)
         if (resolvedTool !== "polygon") return;
         e.stopPropagation();
         commitShapeIfReady(true);
@@ -240,6 +253,11 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                     onPointerCancel={handlePointerCancel}
                     onDoubleClick={handleDoubleClick}
                 >
+                    {/*
+                        Groupe principal des formes :
+                        On applique une transformation pour passer des coordonnées image
+                        aux coordonnées SVG affichées (centrage + zoom + translation).
+                    */}
                     <g
                         transform={`translate(${width / 2}, ${height / 2}) scale(${viewState.zoom}) translate(${-viewState.x}, ${-viewState.y})`}
                     >

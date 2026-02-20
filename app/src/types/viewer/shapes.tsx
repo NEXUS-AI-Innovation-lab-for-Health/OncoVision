@@ -17,6 +17,10 @@ export abstract class Shape {
 
   abstract getMetrics(): ShapeMetrics;
 
+  // `renderLabel` peut recevoir un paramètre `scale` optionnel :
+  // - factor : multiplicateur (valeur d'une unité choisie par pixel)
+  // - unit   : chaîne de l'unité (ex: 'nm', 'µm', 'mm', 'px')
+  // Les implementations utilisent `factor` et `unit` pour convertir px -> unité choisie.
   abstract renderLabel(metrics: ShapeMetrics, scale?: { factor: number; unit: string }): ReactNode;
 
   get getType(): string {
@@ -107,10 +111,12 @@ export class Line extends Shape implements Bordered {
   }
 
   renderLabel(metrics: ShapeMetrics, scale?: { factor: number; unit: string }): ReactNode {
+    // length en pixels fourni par getMetrics()
     const { length } = metrics;
     const lengthPx = length ?? 0;
     const factor = scale?.factor ?? 1;
     const unit = scale?.unit ?? 'px';
+    // Si unité = 'px' on affiche tel quel, sinon on multiplie par factor
     const lengthConverted = unit === 'px' ? lengthPx : lengthPx * factor;
 
     const dx = this.end.x - this.start.x;
@@ -213,6 +219,7 @@ export class Circle extends Shape implements Bordered {
   }
 
   renderLabel(metrics: ShapeMetrics, scale?: { factor: number; unit: string }): ReactNode {
+    // Convertit radius/diameter/perimeter/area depuis px vers unité choisie
     const { centroid } = metrics;
     const factor = scale?.factor ?? 1;
     const unit = scale?.unit ?? 'px';
@@ -358,6 +365,7 @@ export class Ellipse extends Shape implements Bordered {
   }
 
   renderLabel(metrics: ShapeMetrics, scale?: { factor: number; unit: string }): ReactNode {
+    // Ellipse : conversion identique, aire -> factor^2
     const { centroid } = metrics;
     const factor = scale?.factor ?? 1;
     const unit = scale?.unit ?? 'px';
