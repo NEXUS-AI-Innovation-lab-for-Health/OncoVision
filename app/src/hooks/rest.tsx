@@ -25,6 +25,7 @@ export type RestParam = {
     auth?: boolean;
     unbox?: boolean;
     blob?: boolean;
+    signal?: AbortSignal;
 }
 
 export type RestGetParam = RestParam & {
@@ -161,7 +162,7 @@ export function RestProvider(props: RestProviderProps) {
 
     const get = async<T = any>(params: RestGetParam): RestReturnType<T> => {
 
-        const { endpoint, auth = true, params: queryParams = null } = params;
+        const { endpoint, auth = true, params: queryParams = null, signal } = params;
 
         const fullUrl = new URL(`${url}/${endpoint}`);
         if(queryParams)
@@ -171,6 +172,7 @@ export function RestProvider(props: RestProviderProps) {
         const response = await fetch(fullUrl.toString(), {
             method: "GET",
             headers: await createHeaders(auth),
+            signal,
         });
 
         return handleRequest(response, params);

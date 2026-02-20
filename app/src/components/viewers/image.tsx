@@ -79,9 +79,40 @@ interface ViewState {
 }
 
 // Global cache for tile images to avoid re-downloading during session/navigation
-// In a more robust implementation, we would manage cache size and cleanup (LRU).
 const tileCache = new Map<string, HTMLImageElement>();
-const activeFetches = new Set<string>();
+
+// Queue system: limited concurrency to avoid saturating the browser's HTTP connection pool
+const TILE_CONCURRENCY = 6;
+const activeTileFetches = new Map<string, AbortController>();
+interface QueuedTile { cacheKey: string; execute: () => void; }
+const tileQueue: QueuedTile[] = [];
+
+function processTileQueue() {
+    while (activeTileFetches.size < TILE_CONCURRENCY && tileQueue.length > 0) {
+        const item = tileQueue.shift()!;
+        // Skip tiles somehow already cached (edge case)
+        if (!tileCache.has(item.cacheKey)) {
+            item.execute();
+        }
+    }
+}
+
+/** Remove queue entries and abort in-flight requests for tiles no longer needed */
+function cancelStaleTiles(neededKeys: Set<string>) {
+    // Remove from queue
+    for (let i = tileQueue.length - 1; i >= 0; i--) {
+        if (!neededKeys.has(tileQueue[i].cacheKey)) {
+            tileQueue.splice(i, 1);
+        }
+    }
+    // Abort in-flight
+    for (const [key, controller] of activeTileFetches) {
+        if (!neededKeys.has(key)) {
+            controller.abort();
+            activeTileFetches.delete(key);
+        }
+    }
+}
 
 export default function ImageViewer(props: ImageViewerProps) {
 
@@ -199,6 +230,19 @@ export default function ImageViewer(props: ImageViewerProps) {
         const maxTilesX = Math.ceil(levelWidth / tileSize);
         const maxTilesY = Math.ceil(levelHeight / tileSize);
 
+        // 1. Compute the set of needed tile keys for this draw pass
+        const neededKeys = new Set<string>();
+        for (let tx = minTileX; tx <= maxTileX; tx++) {
+            for (let ty = minTileY; ty <= maxTileY; ty++) {
+                if (tx < 0 || tx >= maxTilesX || ty < 0 || ty >= maxTilesY) continue;
+                neededKeys.add(`${imageId}-${targetLevel}-${tx}-${ty}`);
+            }
+        }
+
+        // 2. Cancel requests for tiles that are no longer needed
+        cancelStaleTiles(neededKeys);
+
+        // 3. Draw tiles and enqueue missing ones
         for (let tx = minTileX; tx <= maxTileX; tx++) {
             for (let ty = minTileY; ty <= maxTileY; ty++) {
                 if (tx < 0 || tx >= maxTilesX || ty < 0 || ty >= maxTilesY) continue;
@@ -232,39 +276,57 @@ export default function ImageViewer(props: ImageViewerProps) {
                 if (cachedImg) {
                     ctx.drawImage(cachedImg, 0, 0, tileW, tileH, screenX - overlap, screenY - overlap, drawW + 2*overlap, drawH + 2*overlap);
                 } else {
-                    // Start loading if not already in progress
-                    if (!activeFetches.has(cacheKey)) {
-                        activeFetches.add(cacheKey);
-                        // API call to fetch the Blob
-                        get({ 
-                            endpoint: `viewer/images/${imageId}/tile/${targetLevel}/${tx}_${ty}.webp`,
-                            blob: true 
-                        }).then((blob) => {
-                            if (blob instanceof Blob) {
-                                const url = URL.createObjectURL(blob);
-                                const img = new Image();
-                                img.onload = () => {
-                                    tileCache.set(cacheKey, img);
-                                    activeFetches.delete(cacheKey);
-                                    URL.revokeObjectURL(url); 
-                                    requestAnimationFrame(draw); 
-                                };
-                                img.onerror = () => {
-                                    console.error("Image load error", cacheKey);
-                                    activeFetches.delete(cacheKey);
-                                }
-                                img.src = url;
-                            } else {
-                                activeFetches.delete(cacheKey);
+                    // Enqueue if not already active or queued
+                    const alreadyQueued = tileQueue.some(t => t.cacheKey === cacheKey);
+                    if (!activeTileFetches.has(cacheKey) && !alreadyQueued) {
+                        // Capture loop variables for the closure
+                        const _tx = tx, _ty = ty, _level = targetLevel;
+                        tileQueue.push({
+                            cacheKey,
+                            execute: () => {
+                                const controller = new AbortController();
+                                activeTileFetches.set(cacheKey, controller);
+                                get({
+                                    endpoint: `viewer/images/${imageId}/tile/${_level}/${_tx}_${_ty}.webp`,
+                                    blob: true,
+                                    signal: controller.signal,
+                                }).then((blob) => {
+                                    if (blob instanceof Blob) {
+                                        const url = URL.createObjectURL(blob);
+                                        const img = new Image();
+                                        img.onload = () => {
+                                            tileCache.set(cacheKey, img);
+                                            activeTileFetches.delete(cacheKey);
+                                            URL.revokeObjectURL(url);
+                                            processTileQueue();
+                                            requestAnimationFrame(draw);
+                                        };
+                                        img.onerror = () => {
+                                            console.error("Image load error", cacheKey);
+                                            activeTileFetches.delete(cacheKey);
+                                            processTileQueue();
+                                        };
+                                        img.src = url;
+                                    } else {
+                                        activeTileFetches.delete(cacheKey);
+                                        processTileQueue();
+                                    }
+                                }).catch((e) => {
+                                    if (e?.name !== 'AbortError') {
+                                        console.error("Fetch error", cacheKey, e);
+                                    }
+                                    activeTileFetches.delete(cacheKey);
+                                    processTileQueue();
+                                });
                             }
-                        }).catch((e) => {
-                            console.error("Fetch error", e);
-                            activeFetches.delete(cacheKey);
                         });
                     }
                 }
             }
         }
+
+        // 4. Kick off queue processing after enqueuing all needed tiles
+        processTileQueue();
         
         // Debug info (Removed to screen space is clean)
         // ctx.fillStyle = "white";

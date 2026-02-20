@@ -5,7 +5,7 @@ from pathlib import Path
 from uuid import uuid4
 from io import BytesIO
 import math
-import shutil
+import threading
 
 from PIL import Image
 from openslide.lowlevel import OpenSlideUnsupportedFormatError
@@ -53,6 +53,10 @@ class ImageRegistry:
             self.fs.mkdir(bucket_path)
 
         self.collection = mongo_connection.get_database()[bucket]
+
+        # Per-image lock to prevent concurrent source downloads
+        self._source_locks: dict[str, threading.Lock] = {}
+        self._locks_mutex = threading.Lock()
 
     def register_and_upload_levels(self, kind: ImageFormat, image_path: Path, *, debug: bool = False) -> ImageRecord:
         image_id = uuid4().hex
@@ -186,45 +190,85 @@ class ImageRegistry:
 
     def get_tile_png(self, image_id: str, level: int, tx: int, ty: int) -> bytes:
         tile_key = f"{image_id}/{level}/{tx}_{ty}.webp"
+        full_key = f"{self.bucket}/{tile_key}"
         try:
-            with self.fs.open(f"{self.bucket}/{tile_key}", 'rb') as f:
+            with self.fs.open(full_key, 'rb') as f:
                 return f.read()
-        except FileNotFoundError:
-            record = self.get(image_id)
-            # Génération à la demande
-            local_source = self._ensure_source_local(record)
-            medical_img = self._open_image(record.kind, local_source)
-            tile_bytes = medical_img.tile_png(level, tx, ty)
-            # Cache la tuile si on est dans des coordonnées valides
-            self.fs.pipe(f"{self.bucket}/{tile_key}", tile_bytes)
-            return tile_bytes
+        except (FileNotFoundError, PermissionError, OSError):
+            pass
+        except Exception as e:
+            # s3fs peut lever d'autres exceptions (ex: ClientError) pour un objet absent
+            err_str = str(e).lower()
+            if "nosuchkey" not in err_str and "not found" not in err_str and "404" not in err_str:
+                raise  # erreur inattendue, on la propage
+
+        # Génération à la demande
+        record = self.get(image_id)
+        local_source = self._ensure_source_local(record)
+        medical_img = self._open_image(record.kind, local_source)
+        tile_bytes = medical_img.tile_png(level, tx, ty)
+        # Cache la tuile pour les prochaines requêtes
+        try:
+            self.fs.pipe(full_key, tile_bytes)
+        except Exception as cache_err:
+            print(f"[registry] Warning: failed to cache tile {tile_key}: {cache_err}")
+        return tile_bytes
+
+    def _get_source_lock(self, image_id: str) -> threading.Lock:
+        with self._locks_mutex:
+            if image_id not in self._source_locks:
+                self._source_locks[image_id] = threading.Lock()
+            return self._source_locks[image_id]
 
     def _ensure_source_local(self, record: ImageRecord) -> Path:
         source_suffix = Path(record.source_key).suffix
         local_path = Path(f"/tmp/{record.id}{source_suffix}")
+        local_tiles_dir = Path(f"/tmp/{record.id}_files")
+
+        # Fast-path: already fully downloaded
         if local_path.exists():
             if record.kind != "DEEPZOOM" or not record.tiles_prefix:
                 return local_path
-            local_tiles_dir = Path(f"/tmp/{record.id}_files")
             if local_tiles_dir.exists() and any(local_tiles_dir.rglob("*")):
                 return local_path
 
-        with self.fs.open(f"{record.bucket}/{record.source_key}", "rb") as src, open(local_path, "wb") as dst:
-            shutil.copyfileobj(src, dst)
+        # Serialize concurrent downloads per image
+        with self._get_source_lock(record.id):
+            # Re-check under lock
+            if local_path.exists():
+                if record.kind != "DEEPZOOM" or not record.tiles_prefix:
+                    return local_path
+                if local_tiles_dir.exists() and any(local_tiles_dir.rglob("*")):
+                    return local_path
 
-        if record.kind == "DEEPZOOM" and record.tiles_prefix:
-            local_tiles_dir = Path(f"/tmp/{record.id}_files")
-            if not local_tiles_dir.exists():
+            # Download source atomically via temp file
+            tmp_source = local_path.with_suffix(local_path.suffix + ".tmp")
+            try:
+                with self.fs.open(f"{record.bucket}/{record.source_key}", "rb") as src:
+                    tmp_source.write_bytes(src.read())
+                tmp_source.replace(local_path)
+            except Exception:
+                tmp_source.unlink(missing_ok=True)
+                raise
+
+            if record.kind == "DEEPZOOM" and record.tiles_prefix:
                 local_tiles_dir.mkdir(parents=True, exist_ok=True)
                 remote_prefix = f"{record.bucket}/{record.tiles_prefix}"
                 for remote_path in self.fs.find(remote_prefix):
                     if remote_path.endswith("/"):
                         continue
-                    rel_path = remote_path[len(remote_prefix) + 1 :]
+                    rel_path = remote_path[len(remote_prefix) + 1:]
                     local_tile_path = local_tiles_dir / rel_path
                     local_tile_path.parent.mkdir(parents=True, exist_ok=True)
-                    with self.fs.open(remote_path, "rb") as src, open(local_tile_path, "wb") as dst:
-                        shutil.copyfileobj(src, dst)
+                    tmp_tile = local_tile_path.with_suffix(local_tile_path.suffix + ".tmp")
+                    try:
+                        with self.fs.open(remote_path, "rb") as src:
+                            tmp_tile.write_bytes(src.read())
+                        tmp_tile.replace(local_tile_path)
+                    except Exception:
+                        tmp_tile.unlink(missing_ok=True)
+                        raise
+
         return local_path
 
     def _open_image(self, kind: ImageFormat, path: Path) -> MedicalImage:
