@@ -75,16 +75,16 @@ export function RestProvider(props: RestProviderProps) {
 
     const { url } = props;
     
-    const [cookies, setCookie, removeCookie] = useCookies(['access_token']);
+    const [cookies, setCookie, removeCookie] = useCookies(['image_token']);
     const [token, _setToken] = useState<Token | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
 
     const setToken = async (token: Token | null) => {
         _setToken(token);
         if(token && token.value) {
-            setCookie('access_token', JSON.stringify(token), { path: '/' });
+            setCookie('image_token', JSON.stringify(token), { path: '/' });
         } else {
-            removeCookie('access_token', { path: '/' });
+            removeCookie('image_token', { path: '/' });
         }
     }
 
@@ -204,7 +204,7 @@ export function RestProvider(props: RestProviderProps) {
         const loadToken = async () => {
             setLoading(true);
         
-            const storedToken = cookies['access_token'];
+            const storedToken = cookies['image_token'];
             if (storedToken) {
                 const parsedToken: Token = JSON.parse(storedToken);
                 _setToken(parsedToken);
