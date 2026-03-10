@@ -136,6 +136,16 @@ export default function ImageViewer(props: ImageViewerProps) {
     const [canvasSize, setCanvasSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
     const [activeTool, setActiveTool] = useState<CanvaTool>("pan");
 
+    const getFitZoom = useCallback(() => {
+        if (!infoRef.current || !containerRef.current) return 0.001;
+        const containerW = containerRef.current.clientWidth;
+        const containerH = containerRef.current.clientHeight;
+        const scaleX = containerW / infoRef.current.width;
+        const scaleY = containerH / infoRef.current.height;
+        // Keep min zoom aligned with "fit to screen" while respecting max zoom cap.
+        return Math.min(1, Math.min(scaleX, scaleY));
+    }, []);
+
     // 1. Fetch image info
     const { data: info, refetch } = useQuery<any>({
         queryKey: ["viewer", "images", imageId, "info"],
@@ -156,13 +166,7 @@ export default function ImageViewer(props: ImageViewerProps) {
     // Initialize view to center when info arrives
     useEffect(() => {
         if (info && containerRef.current) {
-            const containerW = containerRef.current.clientWidth;
-            const containerH = containerRef.current.clientHeight;
-            
-            // Initial zoom to see the entire image (contain) without excessive margin
-            const scaleX = containerW / info.width;
-            const scaleY = containerH / info.height;
-            const initialZoom = Math.min(scaleX, scaleY);
+            const initialZoom = getFitZoom();
 
             const newState = {
                 x: info.width / 2,
@@ -173,6 +177,13 @@ export default function ImageViewer(props: ImageViewerProps) {
             viewStateRef.current = newState;
         }
     }, [info]);
+
+    // Enforce dynamic minimum zoom after layout changes (e.g. resize).
+    useEffect(() => {
+        if (!info) return;
+        const minZoom = getFitZoom();
+        setViewState(prev => (prev.zoom < minZoom ? { ...prev, zoom: minZoom } : prev));
+    }, [info, canvasSize, getFitZoom]);
 
     // Main stable drawing function
     const draw = useCallback(() => {
@@ -359,7 +370,8 @@ export default function ImageViewer(props: ImageViewerProps) {
                 
                 setViewState(prev => {
                     let newZoom = prev.zoom * factor;
-                    if (newZoom < 0.001) newZoom = 0.001;
+                    const minZoom = getFitZoom();
+                    if (newZoom < minZoom) newZoom = minZoom;
                     if (newZoom > 1) newZoom = 1; // Limit zoom to server's maximum level
                     return { ...prev, zoom: newZoom };
                 });
@@ -375,7 +387,8 @@ export default function ImageViewer(props: ImageViewerProps) {
                 
                 setViewState(prev => {
                     let newZoom = prev.zoom * factor;
-                    if (newZoom < 0.001) newZoom = 0.001;
+                    const minZoom = getFitZoom();
+                    if (newZoom < minZoom) newZoom = minZoom;
                     if (newZoom > 1) newZoom = 1; // Limit zoom to server's maximum level
                     return { ...prev, zoom: newZoom };
                 });
@@ -396,7 +409,7 @@ export default function ImageViewer(props: ImageViewerProps) {
             element.removeEventListener('gesturechange', PreventDefault);
             element.removeEventListener('gestureend', PreventDefault);
         }
-    }, []); // Empty deps = bind once
+    }, [getFitZoom]); // Keep min zoom dynamic with current layout
 
     const handleMouseDown = (e: React.MouseEvent) => {
         if (isDrawingActive) return;
@@ -469,17 +482,14 @@ export default function ImageViewer(props: ImageViewerProps) {
     // Convenient zoom helpers
     const zoomBy = (factor: number) => setViewState(prev => {
         let newZoom = prev.zoom * factor;
-        newZoom = Math.max(0.001, Math.min(1, newZoom));
+        const minZoom = getFitZoom();
+        newZoom = Math.max(minZoom, Math.min(1, newZoom));
         return { ...prev, zoom: newZoom };
     });
 
     const fitToScreen = () => {
         if (!info || !containerRef.current) return;
-        const containerW = containerRef.current.clientWidth;
-        const containerH = containerRef.current.clientHeight;
-        const scaleX = containerW / info.width;
-        const scaleY = containerH / info.height;
-        const initialZoom = Math.min(scaleX, scaleY);
+        const initialZoom = getFitZoom();
         // Animate instead of hard set for better feel
         animateTo({ x: info.width / 2, y: info.height / 2, zoom: initialZoom });
     };
@@ -515,6 +525,8 @@ export default function ImageViewer(props: ImageViewerProps) {
     }, [draw, info]);
 
     if (!info) return <div style={{ color: "white" }}>Chargement des métadonnées...</div>;
+
+    const minZoom = getFitZoom();
 
     const defaultCanvaProps: CanvaProps = {
         viewState,
@@ -573,11 +585,11 @@ export default function ImageViewer(props: ImageViewerProps) {
                     <div style={{ height: 110, padding: '6px 0' }}>
                         <Slider
                             vertical
-                            min={0.01}
+                            min={minZoom}
                             max={1}
                             step={0.01}
                             value={viewState.zoom}
-                            onChange={(value: number) => setViewState(prev => ({ ...prev, zoom: value }))}
+                            onChange={(value: number) => setViewState(prev => ({ ...prev, zoom: Math.max(minZoom, Math.min(1, value)) }))}
                             tooltip={{ formatter: (value: number | undefined) => `Zoom: ${Math.round((value || 0) * 100)}%`, placement: 'right' }}
                             handleStyle={{ borderColor: '#1366FF', background: '#1366FF' }}
                             trackStyle={{ backgroundColor: '#1366FF' }}
