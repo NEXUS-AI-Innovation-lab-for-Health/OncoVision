@@ -1,13 +1,14 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import {
+    CanvaCursor,
     CircleCursor,
-    DrawingCursor,
     EllipseCursor,
     LineCursor,
     PensilCursor,
     PolygonCursor,
     RectangleCursor,
+    ShapeSelectorCursor,
 } from "../../types/viewer/cursors";
 import type { CursorBoundingBox, CursorType } from "../../types/viewer/cursors";
 import { Circle, Ellipse, Line, Polygon, Polyline, Rectangle, Shape } from "../../types/viewer/shapes";
@@ -87,11 +88,17 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
 
     const [internalTool] = useState<CanvaTool>("pan");
     const resolvedTool = activeTool ?? internalTool;
-    const cursorRef = useRef<DrawingCursor | null>(null);
+    const cursorRef = useRef<CanvaCursor | null>(null);
     const cursorWorldPosRef = useRef<Point | null>(null);
     const [shapes, setShapes] = useState<Shape[]>(initialShapes);
     const [previewShape, setPreviewShape] = useState<Shape | null>(null);
     const [isDrawing, setIsDrawing] = useState(false);
+    const [selectedShapeIds, setSelectedShapeIds] = useState<Set<string>>(new Set());
+    const [hoveredInfo, setHoveredInfo] = useState<null | {
+        idx: number;
+        box: { x: number; y: number; w: number; h: number };
+        anchor: Point;
+    }>(null); // used below for highlighting and connection line
     const listenerRef = useRef<((shape: Shape, shapes: Shape[]) => void) | null>(null);
 
     const bounds: CursorBoundingBox | undefined = (imageWidth && imageHeight) ? { width: imageWidth, height: imageHeight } : undefined;
@@ -112,7 +119,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
 
         const { color, width: strokeWidth } = properties.shape.strike;
 
-        const createCursor = (tool: CursorType): DrawingCursor => {
+        const createCursor = (tool: CursorType): CanvaCursor => {
             switch (tool) {
                 case "line":
                     return new LineCursor(color, strokeWidth);
@@ -126,6 +133,8 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                     return new RectangleCursor(color, strokeWidth);
                 case "polygon":
                     return new PolygonCursor(color, strokeWidth);
+                case "selector":
+                    return new ShapeSelectorCursor("#4ea1ff", 1.5, getShapeBBox);
                 default:
                     return new LineCursor(color, strokeWidth);
             }
@@ -195,7 +204,17 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
 
     const commitShapeIfReady = (force?: boolean) => {
         if (!cursorRef.current) return;
+        if (cursorRef.current instanceof ShapeSelectorCursor) {
+            cursorRef.current.setSelectableShapes(shapes);
+        }
         const shape = cursorRef.current.finish(force);
+        if (cursorRef.current instanceof ShapeSelectorCursor) {
+            const selected = new Set(cursorRef.current.getSelectedShapes().map((s) => s.getId() as string));
+            setSelectedShapeIds(selected);
+            setPreviewShape(null);
+            setIsDrawing(false);
+            return;
+        }
         if (shape) {
             addShape(shape);
             setPreviewShape(null);
@@ -215,6 +234,9 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
 
         (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
         cursorRef.current.press(point, bounds);
+        if (resolvedTool === "selector") {
+            setSelectedShapeIds(new Set());
+        }
         setPreviewShape(cursorRef.current.createPreview());
         setIsDrawing(true);
         onDrawingActiveChange?.(true);
@@ -411,16 +433,43 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         const lx = Math.max(visible.minX + 4, Math.min(desiredX, visible.maxX - boxW - 4));
         const ly = Math.max(visible.minY + 4, Math.min(desiredY, visible.maxY - boxH - 4));
 
-        if (isDrawing && cursorWorldPosRef.current) {
-            const { x: cx, y: cy } = cursorWorldPosRef.current;
+        if (isDrawing) {
             const margin = 12 / viewState.zoom;
-            if (cx >= lx - margin && cx <= lx + boxW + margin && cy >= ly - margin && cy <= ly + boxH + margin) {
-                return null;
+            if (cursorWorldPosRef.current) {
+                const { x: cx, y: cy } = cursorWorldPosRef.current;
+                if (cx >= lx - margin && cx <= lx + boxW + margin && cy >= ly - margin && cy <= ly + boxH + margin) {
+                    return null;
+                }
+            }
+            if (previewShape) {
+                const pbbox = getShapeBBox(previewShape);
+                if (pbbox) {
+                    if (
+                        pbbox.maxX >= lx - margin &&
+                        pbbox.minX <= lx + boxW + margin &&
+                        pbbox.maxY >= ly - margin &&
+                        pbbox.minY <= ly + boxH + margin
+                    ) {
+                        return null;
+                    }
+                }
             }
         }
 
+        const groupProps = {
+            key: `shape-details-${idx}`,
+            pointerEvents: "all" as const,
+            style: { userSelect: "none" } as any,
+            onPointerEnter: () => {
+                setHoveredInfo({ idx, box: { x: lx, y: ly, w: boxW, h: boxH }, anchor });
+            },
+            onPointerLeave: () => {
+                setHoveredInfo((h) => (h?.idx === idx ? null : h));
+            },
+        };
+
         return (
-            <g key={`shape-details-${idx}`} pointerEvents="none" style={{ userSelect: "none" }}>
+            <g {...groupProps}>
                 <rect
                     x={lx}
                     y={ly}
@@ -436,7 +485,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                 <text
                     x={lx + pad}
                     y={ly + pad + 9}
-                    fill="rgba(255,255,255,0.38)"
+                    fill="white"
                     fontSize={7}
                     fontWeight={700}
                     fontFamily="system-ui, sans-serif"
@@ -495,11 +544,44 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                     <g
                         transform={`translate(${width / 2}, ${height / 2}) scale(${viewState.zoom}) translate(${-viewState.x}, ${-viewState.y})`}
                     >
-                        {shapes.map((shape, idx) => (
-                            <g key={`shape-${idx}`}>{shape.render()}</g>
-                        ))}
+                        {shapes.map((shape, idx) => {
+                            const elem = shape.render() as any;
+                            if (hoveredInfo?.idx === idx) {
+                                // override stroke and strokeWidth for highlight
+                                const override: any = { stroke: "#409EFF" };
+                                const baseWidth = elem.props?.strokeWidth ?? ("borderWidth" in shape ? (shape as any).borderWidth : undefined);
+                                if (typeof baseWidth === "number") override.strokeWidth = baseWidth + 2;
+                                return <g key={`shape-${idx}`}>{React.cloneElement(elem, override)}</g>;
+                            }
+                            if (selectedShapeIds.has(shape.getId() as string)) {
+                                const override: any = { stroke: "#22c55e" };
+                                const baseWidth = elem.props?.strokeWidth ?? ("borderWidth" in shape ? (shape as any).borderWidth : undefined);
+                                if (typeof baseWidth === "number") override.strokeWidth = baseWidth + 1.5;
+                                return <g key={`shape-${idx}`}>{React.cloneElement(elem, override)}</g>;
+                            }
+                            return <g key={`shape-${idx}`}>{elem}</g>;
+                        })}
                         {shapes.map((shape, idx) => renderShapeDetails(shape, idx))}
-                        {previewShape && <g opacity={0.7}>{previewShape.render()}</g>}
+                        {previewShape && (
+                            <g opacity={0.75}>
+                                {resolvedTool === "selector" && previewShape instanceof Rectangle ? (
+                                    <>
+                                        <rect
+                                            x={previewShape.origin.x}
+                                            y={previewShape.origin.y}
+                                            width={previewShape.width}
+                                            height={previewShape.height}
+                                            fill="rgba(78, 161, 255, 0.14)"
+                                            stroke="#4ea1ff"
+                                            strokeWidth={1.5 / viewState.zoom}
+                                            strokeDasharray={`${6 / viewState.zoom} ${4 / viewState.zoom}`}
+                                        />
+                                    </>
+                                ) : (
+                                    previewShape.render()
+                                )}
+                            </g>
+                        )}
                     </g>
                 </svg>
             )}

@@ -9,6 +9,7 @@ import { FaUndo } from "react-icons/fa";
 import { CiSettings } from "react-icons/ci";
 import { CiZoomIn } from "react-icons/ci";
 import { CiZoomOut } from "react-icons/ci";
+import { BsCursor } from "react-icons/bs";
 import ToolSettings from "./setting";  // now expects setProperties prop
 
 interface ToolbarProps {
@@ -64,6 +65,12 @@ const ToolIcon = ({ name, size = 14 }: { name: string; size?: number }) => {
                 <svg {...common}>
                     <polygon points="12 2 2 7 5 20 19 20 22 7 12 2" />
                 </svg>
+            );
+        case "selector":
+            return (
+                <div>
+                    <BsCursor size={size} />
+                </div>
             );
         default:
             return null;
@@ -228,6 +235,16 @@ export default function Toolbar(props: ToolbarProps) {
                     style={{ color: activeTool === "polygon" ? "#1366FF" : "#E9EEF5", background: "transparent", border: "none", borderRadius: 8, display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-start", padding: "6px 10px" }}
                 >
                     Polygone
+                </Button>
+
+                <Button
+                    type="text"
+                    size="small"
+                    icon={<ToolIcon name="selector" />}
+                    onClick={() => setActiveTool("selector")}
+                    style={{ color: activeTool === "selector" ? "#1366FF" : "#E9EEF5", background: "transparent", border: "none", borderRadius: 8, display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-start", padding: "6px 10px" }}
+                >
+                    Curseur
                 </Button>
 
                 <ToolbarItem

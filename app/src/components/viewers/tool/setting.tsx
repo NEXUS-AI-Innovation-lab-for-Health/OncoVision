@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent, Dispatch, SetStateAction } from "react";
-import { Slider, InputNumber, Select } from "antd";
+import { Slider, InputNumber, Select, Switch } from "antd";
 import type { CanvaProps, Properties, MeterUnit } from "../canva";
 import { DEFAULT_PROPERTIES } from "../canva";
 
@@ -15,15 +15,21 @@ export default function ToolSettings(props: ToolSettingsProps) {
     // local copies
     const currentStroke = canva.properties?.shape.strike ?? DEFAULT_PROPERTIES.shape.strike;
     const currentUnit: MeterUnit = canva.properties?.canva.unit ?? DEFAULT_PROPERTIES.canva.unit;
+    const currentDetails = canva.properties?.shape.details ?? DEFAULT_PROPERTIES.shape.details;
     const [color, setColor] = useState<string>(currentStroke.color);
     const [width, setWidth] = useState<number>(currentStroke.width);
     const [unit, setUnit] = useState<MeterUnit>(currentUnit);
+    const [details, setDetails] = useState<boolean>(currentDetails);
 
     // keep local state in sync when parent changes the properties externally
     useEffect(() => {
         setColor(currentStroke.color);
         setWidth(currentStroke.width);
     }, [currentStroke]);
+
+    useEffect(() => {
+        setDetails(currentDetails);
+    }, [currentDetails]);
 
     useEffect(() => {
         setUnit(currentUnit);
@@ -49,6 +55,17 @@ export default function ToolSettings(props: ToolSettingsProps) {
             canva: {
                 ...prev.canva,
                 unit: newUnit,
+            },
+        }));
+    };
+
+    const onDetailsChange = (checked: boolean) => {
+        setDetails(checked);
+        setProperties((prev) => ({
+            ...prev,
+            shape: {
+                ...prev.shape,
+                details: checked,
             },
         }));
     };
@@ -91,6 +108,11 @@ export default function ToolSettings(props: ToolSettingsProps) {
                         ]}
                         style={{ width: "100%" }}
                     />
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <label>Infos formes</label>
+                    <Switch size="small" checked={details} onChange={onDetailsChange} />
                 </div>
 
                 <div>
