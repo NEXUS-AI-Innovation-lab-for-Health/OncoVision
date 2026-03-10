@@ -9,7 +9,7 @@ import { FaUndo } from "react-icons/fa";
 import { CiSettings } from "react-icons/ci";
 import { CiZoomIn } from "react-icons/ci";
 import { CiZoomOut } from "react-icons/ci";
-import ToolSettings from "./setting";
+import ToolSettings from "./setting";  // now expects setShapeProperties prop
 
 interface ToolbarProps {
     canva: CanvaProps;
@@ -232,7 +232,7 @@ export default function Toolbar(props: ToolbarProps) {
 
                 <ToolbarItem
                     panel={
-                        <ToolSettings canva={canva} />
+                        <ToolSettings canva={canva} setShapeProperties={_setShapeProperties} />
                     }
                 >
                     <Button
