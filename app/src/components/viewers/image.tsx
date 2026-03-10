@@ -1,69 +1,9 @@
 import { useEffect, useRef, useState, useCallback, type ComponentType } from "react";
-import { Slider, Button, Tooltip } from "antd";
-import { FiZoomIn } from "react-icons/fi";
 import { useRest } from "../../hooks/rest";
-import ToolbarOverlayItem from "../tool/ToolbarOverlayItem";
+import Toolbar from "./tool/bar";
 import ImagePreview from "./preview"; // New import
 import Canva from "./canva";
 import type { CanvaHandle, CanvaTool, CanvaProps } from "./canva";
-
-// Small inline icons to avoid extra dependencies and ensure consistent look on dark background
-const ToolIcon = ({ name, size = 14 }: { name: string; size?: number }) => {
-    const common: any = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' };
-    switch (name) {
-        case 'pan':
-            return (
-                <svg {...common}>
-                    <path d="M12 2v4M12 18v4M4 12h4M16 12h4" />
-                </svg>
-            );
-        case 'pensil':
-            return (
-                <svg {...common}>
-                    <path d="M3 21l3-1 11-11 1 1L7 21 3 21z" />
-                    <path d="M14 7l3 3" />
-                </svg>
-            );
-        case 'line':
-            return (
-                <svg {...common}>
-                    <line x1="4" y1="20" x2="20" y2="4" />
-                </svg>
-            );
-        case 'rectangle':
-            return (
-                <svg {...common}>
-                    <rect x="4" y="6" width="16" height="12" rx="2" />
-                </svg>
-            );
-        case 'circle':
-            return (
-                <svg {...common}>
-                    <circle cx="12" cy="12" r="6" />
-                </svg>
-            );
-        case 'ellipse':
-            return (
-                <svg {...common}>
-                    <ellipse cx="12" cy="12" rx="8" ry="5" />
-                </svg>
-            );
-        case 'polygon':
-            return (
-                <svg {...common}>
-                    <polygon points="12 2 2 7 5 20 19 20 22 7 12 2" />
-                </svg>
-            );
-        case 'erase':
-            return (
-                <svg {...common}>
-                    <path d="M3 6h18M8 6v14a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V6" />
-                </svg>
-            );
-        default:
-            return null;
-    }
-};
 
 interface ImageViewerProps {
     imageId: string;
@@ -540,141 +480,13 @@ export default function ImageViewer(props: ImageViewerProps) {
             onMouseLeave={handleMouseUp}
             onMouseMove={handleMouseMove}
         >
-            <div style={{
-                position: 'absolute',
-                left: 16,
-                top: 16,
-                zIndex: 300,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 10,
-                padding: '12px',
-                background: 'linear-gradient(180deg, rgba(20,22,25,0.95), rgba(14,15,17,0.9))',
-                borderRadius: 12,
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
-                color: '#E9EEF5',
-                width: 120
-            }} onMouseDown={e => e.stopPropagation()}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
-                    <ToolbarOverlayItem
-                        panel={
-                            <div style={{
-                                height: 140,
-                                width: 44,
-                                padding: '10px 0',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                background: 'linear-gradient(180deg, rgba(20,22,25,0.95), rgba(14,15,17,0.9))',
-                                borderRadius: 10,
-                                backdropFilter: 'blur(10px)',
-                                border: '1px solid rgba(255,255,255,0.08)',
-                                boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
-                            }}>
-                                <Slider
-                                    vertical
-                                    min={minZoom}
-                                    max={1}
-                                    step={0.01}
-                                    value={viewState.zoom}
-                                    onChange={(value: number) => setViewState(prev => ({ ...prev, zoom: Math.max(minZoom, Math.min(1, value)) }))}
-                                    tooltip={{ formatter: (value: number | undefined) => `Zoom: ${Math.round((value || 0) * 100)}%`, placement: 'right' }}
-                                    handleStyle={{ borderColor: '#1366FF', background: '#1366FF' }}
-                                    trackStyle={{ backgroundColor: '#1366FF' }}
-                                    railStyle={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
-                                />
-                            </div>
-                        }
-                    >
-                        <Tooltip title="Zoom" placement="right">
-                            <Button
-                                type="text"
-                                shape="circle"
-                                size="small"
-                                icon={<FiZoomIn size={16} />}
-                                style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
-                            />
-                        </Tooltip>
-                    </ToolbarOverlayItem>
-                </div>
-
-                <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <Button
-                        type={activeTool === 'pan' ? 'primary' : 'text'}
-                        size="small"
-                        icon={<ToolIcon name="pan" />}
-                        onClick={() => setActiveTool('pan')}
-                        style={activeTool === 'pan' ? { background: '#1366FF', color: '#FFF', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
-                    >
-                        Pan
-                    </Button>
-
-                    <Button
-                        type={activeTool === 'pensil' ? 'primary' : 'text'}
-                        size="small"
-                        icon={<ToolIcon name="pensil" />}
-                        onClick={() => setActiveTool('pensil')}
-                        style={activeTool === 'pensil' ? { background: '#1366FF', color: '#FFF', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
-                    >
-                        Crayon
-                    </Button>
-
-                    <Button
-                        type={activeTool === 'line' ? 'primary' : 'text'}
-                        size="small"
-                        icon={<ToolIcon name="line" />}
-                        onClick={() => setActiveTool('line')}
-                        style={activeTool === 'line' ? { background: '#1366FF', color: '#FFF', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
-                    >
-                        Ligne
-                    </Button>
-
-                    <Button
-                        type={activeTool === 'rectangle' ? 'primary' : 'text'}
-                        size="small"
-                        icon={<ToolIcon name="rectangle" />}
-                        onClick={() => setActiveTool('rectangle')}
-                        style={activeTool === 'rectangle' ? { background: '#1366FF', color: '#FFF', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
-                    >
-                        Rectangle
-                    </Button>
-
-                    <Button
-                        type={activeTool === 'circle' ? 'primary' : 'text'}
-                        size="small"
-                        icon={<ToolIcon name="circle" />}
-                        onClick={() => setActiveTool('circle')}
-                        style={activeTool === 'circle' ? { background: '#1366FF', color: '#FFF', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
-                    >
-                        Cercle
-                    </Button>
-
-                    <Button
-                        type={activeTool === 'ellipse' ? 'primary' : 'text'}
-                        size="small"
-                        icon={<ToolIcon name="ellipse" />}
-                        onClick={() => setActiveTool('ellipse')}
-                        style={activeTool === 'ellipse' ? { background: '#1366FF', color: '#FFF', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
-                    >
-                        Ellipse
-                    </Button>
-
-                    <Button
-                        type={activeTool === 'polygon' ? 'primary' : 'text'}
-                        size="small"
-                        icon={<ToolIcon name="polygon" />}
-                        onClick={() => setActiveTool('polygon')}
-                        style={activeTool === 'polygon' ? { background: '#1366FF', color: '#FFF', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' } : { color: '#E9EEF5', background: 'transparent', border: '1px solid rgba(255,255,255,0.02)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-start', padding: '6px 10px' }}
-                    >
-                        Polygone
-                    </Button>
-
-                </div>
-            </div>
+            <Toolbar
+                activeTool={activeTool}
+                setActiveTool={setActiveTool}
+                minZoom={minZoom}
+                zoom={viewState.zoom}
+                setViewState={setViewState}
+            />
 
             {/* Thumbnail preview */}
             <div style={{ position: 'absolute', right: 16, top: 16, zIndex: 300 }}>

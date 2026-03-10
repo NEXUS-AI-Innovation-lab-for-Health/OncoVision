@@ -29,7 +29,7 @@ export default function ToolbarItem({ children, panel }: ToolbarItemProps) {
                 position: "relative",
                 display: "flex",
                 width: "100%",
-                justifyContent: "center",
+                justifyContent: "flex-start",
             }}
         >
             <div
@@ -47,7 +47,7 @@ export default function ToolbarItem({ children, panel }: ToolbarItemProps) {
                         setIsOpen(prev => !prev);
                     }
                 }}
-                style={{ display: "inline-flex" }}
+                style={{ display: "flex", width: "100%" }}
             >
                 {children}
             </div>
