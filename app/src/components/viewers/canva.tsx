@@ -13,6 +13,7 @@ import {
 import type { CursorBoundingBox, CursorType } from "../../types/viewer/cursors";
 import { Circle, Ellipse, Line, Polygon, Polyline, Rectangle, Shape } from "../../types/viewer/shapes";
 import type { Point } from "../../types/viewer/shapes";
+import ShapeDetailCard, { SHAPE_DETAIL_BOX_WIDTH, getShapeDetailBoxHeight } from "./detail";
 
 export type CanvaTool = "pan" | CursorType;
 
@@ -94,6 +95,9 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     const [previewShape, setPreviewShape] = useState<Shape | null>(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const [selectedShapeIds, setSelectedShapeIds] = useState<Set<string>>(new Set());
+    const [movingShapeId, setMovingShapeId] = useState<string | null>(null);
+    const moveStartRef = useRef<{ shapeId: string; pointerId: number; startPoint: Point; original: Shape; svg: SVGSVGElement } | null>(null);
+    const moveCleanupRef = useRef<(() => void) | null>(null);
     const [hoveredInfo, setHoveredInfo] = useState<null | {
         idx: number;
         box: { x: number; y: number; w: number; h: number };
@@ -156,9 +160,106 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     };
 
     const removeShape = (shape: Shape) => {
+        const shapeId = shape.getId() as string;
         setShapes((prev) => prev.filter((current) => current !== shape));
+        setSelectedShapeIds((prev) => {
+            if (!prev.has(shapeId)) return prev;
+            const next = new Set(prev);
+            next.delete(shapeId);
+            return next;
+        });
         setPreviewShape(null);
         setIsDrawing(false);
+    };
+
+    const cloneShape = (shape: Shape): Shape => {
+        if (shape instanceof Line) {
+            return new Line({ ...shape.start }, { ...shape.end }, shape.borderColor, shape.borderWidth);
+        }
+        if (shape instanceof Circle) {
+            return new Circle({ ...shape.center }, shape.radius, shape.borderColor, shape.borderWidth);
+        }
+        if (shape instanceof Ellipse) {
+            return new Ellipse({ ...shape.center }, shape.radiusX, shape.radiusY, shape.borderColor, shape.borderWidth);
+        }
+        if (shape instanceof Rectangle) {
+            return new Rectangle({ ...shape.origin }, shape.width, shape.height, shape.borderColor, shape.borderWidth);
+        }
+        if (shape instanceof Polygon) {
+            return new Polygon(shape.points.map((p) => ({ ...p })), shape.borderColor, shape.borderWidth);
+        }
+        if (shape instanceof Polyline) {
+            return new Polyline(shape.points.map((p) => ({ ...p })), shape.borderColor, shape.borderWidth);
+        }
+        return shape;
+    };
+
+    const removeShapeById = (shapeId: string) => {
+        setShapes((prev) => prev.filter((shape) => (shape.getId() as string) !== shapeId));
+        setSelectedShapeIds((prev) => {
+            if (!prev.has(shapeId)) return prev;
+            const next = new Set(prev);
+            next.delete(shapeId);
+            return next;
+        });
+    };
+
+    const startShapeMove = (shape: Shape, e: React.PointerEvent<SVGGElement>) => {
+        const svg = e.currentTarget.ownerSVGElement;
+        if (!svg) return;
+        const shapeId = shape.getId() as string;
+        const startPoint = toImagePointFromClient(e.clientX, e.clientY, svg);
+        const original = cloneShape(shape);
+        const pointerId = e.pointerId;
+
+        moveStartRef.current = { shapeId, pointerId, startPoint, original, svg };
+        setMovingShapeId(shapeId);
+        setSelectedShapeIds(new Set([shapeId]));
+
+        const onMove = (ev: PointerEvent) => {
+            if (ev.pointerId !== pointerId) return;
+            const pt = toImagePointFromClient(ev.clientX, ev.clientY, svg);
+            const dx = pt.x - startPoint.x;
+            const dy = pt.y - startPoint.y;
+            // Mutate shape in-place (avoids clone with new UUID that breaks id tracking)
+            if (shape instanceof Line && original instanceof Line) {
+                shape.start = { x: original.start.x + dx, y: original.start.y + dy };
+                shape.end = { x: original.end.x + dx, y: original.end.y + dy };
+            } else if (shape instanceof Circle && original instanceof Circle) {
+                shape.center = { x: original.center.x + dx, y: original.center.y + dy };
+            } else if (shape instanceof Ellipse && original instanceof Ellipse) {
+                shape.center = { x: original.center.x + dx, y: original.center.y + dy };
+            } else if (shape instanceof Rectangle && original instanceof Rectangle) {
+                shape.origin = { x: original.origin.x + dx, y: original.origin.y + dy };
+            } else if ((shape instanceof Polygon || shape instanceof Polyline) && (original instanceof Polygon || original instanceof Polyline)) {
+                shape.points = original.points.map((p) => ({ x: p.x + dx, y: p.y + dy }));
+            }
+            setShapes((prev) => [...prev]);
+        };
+
+        const onEnd = (ev: PointerEvent) => {
+            if (ev.pointerId !== pointerId) return;
+            cleanup();
+        };
+
+        const cleanup = () => {
+            document.removeEventListener("pointermove", onMove);
+            document.removeEventListener("pointerup", onEnd);
+            document.removeEventListener("pointercancel", onEnd);
+            moveStartRef.current = null;
+            setMovingShapeId(null);
+            moveCleanupRef.current = null;
+        };
+
+        moveCleanupRef.current = cleanup;
+        document.addEventListener("pointermove", onMove);
+        document.addEventListener("pointerup", onEnd);
+        document.addEventListener("pointercancel", onEnd);
+    };
+
+    const stopShapeMove = () => {
+        moveCleanupRef.current?.();
+        moveCleanupRef.current = null;
     };
 
     const setListener = (listener: (shape: Shape, shapes: Shape[]) => void) => {
@@ -181,6 +282,18 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
+        const { x: cx, y: cy, zoom } = viewStateRef.current;
+
+        return {
+            x: (x - width / 2) / zoom + cx,
+            y: (y - height / 2) / zoom + cy,
+        };
+    };
+
+    const toImagePointFromClient = (clientX: number, clientY: number, svg: SVGSVGElement): Point => {
+        const rect = svg.getBoundingClientRect();
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
         const { x: cx, y: cy, zoom } = viewStateRef.current;
 
         return {
@@ -244,6 +357,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
 
     const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
         cursorWorldPosRef.current = toImagePoint(e);
+
         // If not drawing, update cursor feedback to indicate writable area
         if (!isDrawing || !cursorRef.current) {
             if (resolvedTool !== "pan") {
@@ -402,7 +516,10 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     };
 
     const renderShapeDetails = (shape: Shape, idx: number) => {
-        if (!properties.shape.details) return null;
+        const isSelected = selectedShapeIds.has(shape.getId() as string);
+        const shapeId = shape.getId() as string;
+        const isMoving = movingShapeId === shapeId;
+        if (!properties.shape.details && !isSelected) return null;
 
         const details = shape.details(properties);
         const detailEntries = Object.values(details);
@@ -421,12 +538,8 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
             bbox.minY <= visible.maxY;
         if (!shapeVisible) return null;
 
-        const pad = 5;
-        const lineH = 12;
-        const titleH = 13;
-        const sepH = 3;
-        const boxW = 118;
-        const boxH = pad + titleH + sepH + detailEntries.length * lineH + pad;
+        const boxW = SHAPE_DETAIL_BOX_WIDTH;
+        const boxH = getShapeDetailBoxHeight(detailEntries.length);
 
         const desiredX = anchor.x + 5;
         const desiredY = anchor.y - boxH / 2;
@@ -456,66 +569,30 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
             }
         }
 
-        const groupProps = {
-            key: `shape-details-${idx}`,
-            pointerEvents: "all" as const,
-            style: { userSelect: "none" } as any,
-            onPointerEnter: () => {
-                setHoveredInfo({ idx, box: { x: lx, y: ly, w: boxW, h: boxH }, anchor });
-            },
-            onPointerLeave: () => {
-                setHoveredInfo((h) => (h?.idx === idx ? null : h));
-            },
-        };
-
         return (
-            <g {...groupProps}>
-                <rect
-                    x={lx}
-                    y={ly}
-                    width={boxW}
-                    height={boxH}
-                    fill="rgba(20, 22, 25, 0.96)"
-                    stroke="rgba(255, 255, 255, 0.08)"
-                    strokeWidth={0.6}
-                    rx={5}
-                    ry={5}
-                    filter="url(#shape-detail-shadow)"
-                />
-                <text
-                    x={lx + pad}
-                    y={ly + pad + 9}
-                    fill="white"
-                    fontSize={7}
-                    fontWeight={700}
-                    fontFamily="system-ui, sans-serif"
-                    letterSpacing={0.9}
-                    style={{ userSelect: "none" }}
-                >
-                    {shape.getType().toUpperCase()}
-                </text>
-                <line
-                    x1={lx + pad}
-                    y1={ly + pad + titleH}
-                    x2={lx + boxW - pad}
-                    y2={ly + pad + titleH}
-                    stroke="rgba(255,255,255,0.07)"
-                    strokeWidth={0.5}
-                />
-                {detailEntries.map((entry, detailIdx) => (
-                    <text
-                        key={`shape-detail-line-${idx}-${detailIdx}`}
-                        x={lx + pad}
-                        y={ly + pad + titleH + sepH + (detailIdx + 1) * lineH - 2}
-                        fontSize={9}
-                        fontFamily="system-ui, sans-serif"
-                        style={{ userSelect: "none" }}
-                    >
-                        <tspan fill="rgba(141,179,255,0.75)" fontWeight={500}>{entry.label}: </tspan>
-                        <tspan fill="rgba(255,255,255,0.85)">{entry.value}</tspan>
-                    </text>
-                ))}
-            </g>
+            <ShapeDetailCard
+                key={`shape-details-${idx}`}
+                cardKey={`shape-details-${idx}`}
+                shapeType={shape.getType()}
+                detailEntries={detailEntries}
+                x={lx}
+                y={ly}
+                isMoving={isMoving}
+                onHoverStart={() => setHoveredInfo({ idx, box: { x: lx, y: ly, w: boxW, h: boxH }, anchor })}
+                onHoverEnd={() => setHoveredInfo((h) => (h?.idx === idx ? null : h))}
+                onMovePointerDown={(e) => {
+                    e.stopPropagation();
+                    startShapeMove(shape, e);
+                }}
+                onMovePointerUp={(e) => {
+                    e.stopPropagation();
+                    stopShapeMove();
+                }}
+                onDeletePointerDown={(e) => {
+                    e.stopPropagation();
+                    removeShapeById(shapeId);
+                }}
+            />
         );
     };
 
