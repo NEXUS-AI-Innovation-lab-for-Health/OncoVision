@@ -13,7 +13,7 @@ import {
 import type { CursorBoundingBox, CursorType } from "../../types/viewer/cursors";
 import { Circle, Ellipse, Line, Polygon, Polyline, Rectangle, Shape } from "../../types/viewer/shapes";
 import type { Point } from "../../types/viewer/shapes";
-import ShapeDetailCard, { SHAPE_DETAIL_BOX_WIDTH, getShapeDetailBoxHeight } from "./detail";
+import ShapeDetailCard, { SHAPE_DETAIL_BOX_WIDTH, getShapeDetailBoxHeight, SelectionPanel, SELECTION_PANEL_WIDTH, getSelectionPanelHeight } from "./detail";
 
 export type CanvaTool = "pan" | CursorType;
 
@@ -96,6 +96,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     const [isDrawing, setIsDrawing] = useState(false);
     const [selectedShapeIds, setSelectedShapeIds] = useState<Set<string>>(new Set());
     const [movingShapeId, setMovingShapeId] = useState<string | null>(null);
+        const [hoveredSelectionShapeId, setHoveredSelectionShapeId] = useState<string | null>(null);
     const moveStartRef = useRef<{ shapeId: string; pointerId: number; startPoint: Point; original: Shape; svg: SVGSVGElement } | null>(null);
     const moveCleanupRef = useRef<(() => void) | null>(null);
     const onViewStateChangeRef = useRef(onViewStateChange);
@@ -341,6 +342,148 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     const stopShapeMove = () => {
         moveCleanupRef.current?.();
         moveCleanupRef.current = null;
+    };
+
+    const removeAllSelected = () => {
+        const toRemove = new Set(selectedShapeIds);
+        moveCleanupRef.current?.();
+        setShapes((prev) => prev.filter((s) => !toRemove.has(s.getId() as string)));
+        setSelectedShapeIds(new Set());
+        setMovingShapeId(null);
+    };
+
+    const startGroupMove = (selectedShapes: Shape[], e: React.PointerEvent<SVGGElement>) => {
+        const svg = e.currentTarget.ownerSVGElement;
+        if (!svg) return;
+
+        const startPoint = toImagePointFromClient(e.clientX, e.clientY, svg);
+        const pointerId = e.pointerId;
+
+        // Snapshot all selected shapes
+        const originals = new Map<string, Shape>();
+        for (const shape of selectedShapes) {
+            originals.set(shape.getId() as string, cloneShape(shape));
+        }
+
+        // Combined bbox for clamping
+        const origBBox: { minX: number; maxX: number; minY: number; maxY: number } | null = (() => {
+            let mnX = Infinity, mxX = -Infinity, mnY = Infinity, mxY = -Infinity;
+            for (const [, orig] of originals) {
+                const bb = getShapeBBox(orig);
+                if (bb) {
+                    mnX = Math.min(mnX, bb.minX);
+                    mxX = Math.max(mxX, bb.maxX);
+                    mnY = Math.min(mnY, bb.minY);
+                    mxY = Math.max(mxY, bb.maxY);
+                }
+            }
+            return isFinite(mnX) ? { minX: mnX, maxX: mxX, minY: mnY, maxY: mxY } : null;
+        })();
+
+        setMovingShapeId("__group__");
+
+        const latestClientPos = { x: e.clientX, y: e.clientY };
+        let rafId = 0;
+        let active = true;
+
+        const clampGroupDelta = (dx: number, dy: number) => {
+            if (!origBBox || !imageWidth || !imageHeight) return { dx, dy };
+            return {
+                dx: Math.max(-origBBox.minX, Math.min(imageWidth - origBBox.maxX, dx)),
+                dy: Math.max(-origBBox.minY, Math.min(imageHeight - origBBox.maxY, dy)),
+            };
+        };
+
+        const applyGroupOffset = (rawDx: number, rawDy: number) => {
+            const { dx, dy } = clampGroupDelta(rawDx, rawDy);
+            for (const shape of selectedShapes) {
+                const orig = originals.get(shape.getId() as string);
+                if (!orig) continue;
+                if (shape instanceof Line && orig instanceof Line) {
+                    shape.start = { x: orig.start.x + dx, y: orig.start.y + dy };
+                    shape.end = { x: orig.end.x + dx, y: orig.end.y + dy };
+                } else if (shape instanceof Circle && orig instanceof Circle) {
+                    shape.center = { x: orig.center.x + dx, y: orig.center.y + dy };
+                } else if (shape instanceof Ellipse && orig instanceof Ellipse) {
+                    shape.center = { x: orig.center.x + dx, y: orig.center.y + dy };
+                } else if (shape instanceof Rectangle && orig instanceof Rectangle) {
+                    shape.origin = { x: orig.origin.x + dx, y: orig.origin.y + dy };
+                } else if ((shape instanceof Polygon || shape instanceof Polyline) && (orig instanceof Polygon || orig instanceof Polyline)) {
+                    shape.points = orig.points.map((p) => ({ x: p.x + dx, y: p.y + dy }));
+                }
+            }
+        };
+
+        const onMove = (ev: PointerEvent) => {
+            if (ev.pointerId !== pointerId) return;
+            latestClientPos.x = ev.clientX;
+            latestClientPos.y = ev.clientY;
+            const pt = toImagePointFromClient(ev.clientX, ev.clientY, svg);
+            applyGroupOffset(pt.x - startPoint.x, pt.y - startPoint.y);
+            setShapes((prev) => [...prev]);
+        };
+
+        const EDGE_ZONE = 60;
+        const MAX_SPEED = 12;
+        const autopan = () => {
+            if (!active) return;
+            const svgRect = svg.getBoundingClientRect();
+            const cx = latestClientPos.x;
+            const cy = latestClientPos.y;
+            const { zoom } = viewStateRef.current;
+
+            let panDx = 0, panDy = 0;
+            const distLeft   = cx - svgRect.left;
+            const distRight  = svgRect.right - cx;
+            const distTop    = cy - svgRect.top;
+            const distBottom = svgRect.bottom - cy;
+            if (distLeft   < EDGE_ZONE) panDx = -MAX_SPEED * (1 - distLeft   / EDGE_ZONE) / zoom;
+            if (distRight  < EDGE_ZONE) panDx =  MAX_SPEED * (1 - distRight  / EDGE_ZONE) / zoom;
+            if (distTop    < EDGE_ZONE) panDy = -MAX_SPEED * (1 - distTop    / EDGE_ZONE) / zoom;
+            if (distBottom < EDGE_ZONE) panDy =  MAX_SPEED * (1 - distBottom / EDGE_ZONE) / zoom;
+
+            if (origBBox && imageWidth && imageHeight) {
+                const pt = toImagePointFromClient(cx, cy, svg);
+                const rawDx = pt.x - startPoint.x;
+                const rawDy = pt.y - startPoint.y;
+                if (panDx < 0 && rawDx <= -origBBox.minX)              panDx = 0;
+                if (panDx > 0 && rawDx >= imageWidth - origBBox.maxX)   panDx = 0;
+                if (panDy < 0 && rawDy <= -origBBox.minY)              panDy = 0;
+                if (panDy > 0 && rawDy >= imageHeight - origBBox.maxY)  panDy = 0;
+            }
+
+            if ((panDx !== 0 || panDy !== 0) && onViewStateChangeRef.current) {
+                onViewStateChangeRef.current((prev) => ({ ...prev, x: prev.x + panDx, y: prev.y + panDy }));
+                startPoint.x += panDx;
+                startPoint.y += panDy;
+                const pt = toImagePointFromClient(latestClientPos.x, latestClientPos.y, svg);
+                applyGroupOffset(pt.x - startPoint.x, pt.y - startPoint.y);
+                setShapes((prev) => [...prev]);
+            }
+
+            rafId = requestAnimationFrame(autopan);
+        };
+        rafId = requestAnimationFrame(autopan);
+
+        const onEnd = (ev: PointerEvent) => {
+            if (ev.pointerId !== pointerId) return;
+            cleanup();
+        };
+
+        const cleanup = () => {
+            active = false;
+            cancelAnimationFrame(rafId);
+            document.removeEventListener("pointermove", onMove);
+            document.removeEventListener("pointerup", onEnd);
+            document.removeEventListener("pointercancel", onEnd);
+            setMovingShapeId(null);
+            moveCleanupRef.current = null;
+        };
+
+        moveCleanupRef.current = cleanup;
+        document.addEventListener("pointermove", onMove);
+        document.addEventListener("pointerup", onEnd);
+        document.addEventListener("pointercancel", onEnd);
     };
 
     const setListener = (listener: (shape: Shape, shapes: Shape[]) => void) => {
@@ -600,6 +743,8 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         const isSelected = selectedShapeIds.has(shape.getId() as string);
         const shapeId = shape.getId() as string;
         const isMoving = movingShapeId === shapeId;
+        // Skip individual detail card when shape belongs to a multi-selection (handled by SelectionPanel)
+        if (isSelected && selectedShapeIds.size > 1) return null;
         if (!properties.shape.details && !isSelected) return null;
 
         const details = shape.details(properties);
@@ -677,6 +822,58 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         );
     };
 
+    const renderSelectionPanel = () => {
+        if (selectedShapeIds.size < 2) return null;
+        const selectedShapes = shapes.filter((s) => selectedShapeIds.has(s.getId() as string));
+        if (!selectedShapes.length) return null;
+
+        // Combined bbox across all selected shapes
+        let mnX = Infinity, mxX = -Infinity, mnY = Infinity, mxY = -Infinity;
+        for (const shape of selectedShapes) {
+            const bb = getShapeBBox(shape);
+            if (bb) {
+                mnX = Math.min(mnX, bb.minX);
+                mxX = Math.max(mxX, bb.maxX);
+                mnY = Math.min(mnY, bb.minY);
+                mxY = Math.max(mxY, bb.maxY);
+            }
+        }
+        if (!isFinite(mnX)) return null;
+
+        const visible = getVisibleWorldBounds();
+        const panelW = SELECTION_PANEL_WIDTH;
+        const panelH = getSelectionPanelHeight(selectedShapes.length);
+        const desiredX = mxX + 5 / viewState.zoom;
+        const desiredY = mnY;
+        const lx = Math.max(visible.minX + 4 / viewState.zoom, Math.min(desiredX, visible.maxX - panelW - 4 / viewState.zoom));
+        const ly = Math.max(visible.minY + 4 / viewState.zoom, Math.min(desiredY, visible.maxY - panelH - 4 / viewState.zoom));
+
+        return (
+            <SelectionPanel
+                key="selection-panel"
+                shapes={selectedShapes.map((s) => ({ id: s.getId() as string, type: s.getType() }))}
+                x={lx}
+                y={ly}
+                isMoving={movingShapeId === "__group__"}
+                hoveredId={hoveredSelectionShapeId}
+                onRowHoverStart={(id) => setHoveredSelectionShapeId(id)}
+                onRowHoverEnd={() => setHoveredSelectionShapeId(null)}
+                onMovePointerDown={(e) => {
+                    e.stopPropagation();
+                    startGroupMove(selectedShapes, e);
+                }}
+                onMovePointerUp={(e) => {
+                    e.stopPropagation();
+                    stopShapeMove();
+                }}
+                onDeletePointerDown={(e) => {
+                    e.stopPropagation();
+                    removeAllSelected();
+                }}
+            />
+        );
+    };
+
     return (
         <>
             {canRenderSvg && (
@@ -704,14 +901,15 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                     >
                         {shapes.map((shape, idx) => {
                             const elem = shape.render() as any;
-                            if (hoveredInfo?.idx === idx) {
+                            const shapeId = shape.getId() as string;
+                            if (hoveredInfo?.idx === idx || hoveredSelectionShapeId === shapeId) {
                                 // override stroke and strokeWidth for highlight
                                 const override: any = { stroke: "#409EFF" };
                                 const baseWidth = elem.props?.strokeWidth ?? ("borderWidth" in shape ? (shape as any).borderWidth : undefined);
                                 if (typeof baseWidth === "number") override.strokeWidth = baseWidth + 2;
                                 return <g key={`shape-${idx}`}>{React.cloneElement(elem, override)}</g>;
                             }
-                            if (selectedShapeIds.has(shape.getId() as string)) {
+                            if (selectedShapeIds.has(shapeId)) {
                                 const override: any = { stroke: "#22c55e" };
                                 const baseWidth = elem.props?.strokeWidth ?? ("borderWidth" in shape ? (shape as any).borderWidth : undefined);
                                 if (typeof baseWidth === "number") override.strokeWidth = baseWidth + 1.5;
@@ -720,6 +918,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                             return <g key={`shape-${idx}`}>{elem}</g>;
                         })}
                         {shapes.map((shape, idx) => renderShapeDetails(shape, idx))}
+                        {renderSelectionPanel()}
                         {previewShape && (
                             <g opacity={0.75}>
                                 {resolvedTool === "selector" && previewShape instanceof Rectangle ? (
