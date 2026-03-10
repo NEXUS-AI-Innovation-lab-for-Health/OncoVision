@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useCallback, type ComponentType } from "react";
 import { Slider, Button, Tooltip } from "antd";
-import { FiZoomIn, FiZoomOut, FiMaximize2 } from "react-icons/fi";
+import { FiZoomIn } from "react-icons/fi";
 import { useRest } from "../../hooks/rest";
+import ToolbarOverlayItem from "../tool/ToolbarOverlayItem";
 import ImagePreview from "./preview"; // New import
 import Canva from "./canva";
 import type { CanvaHandle, CanvaTool, CanvaProps } from "./canva";
@@ -479,21 +480,6 @@ export default function ImageViewer(props: ImageViewerProps) {
         }));
     };
 
-    // Convenient zoom helpers
-    const zoomBy = (factor: number) => setViewState(prev => {
-        let newZoom = prev.zoom * factor;
-        const minZoom = getFitZoom();
-        newZoom = Math.max(minZoom, Math.min(1, newZoom));
-        return { ...prev, zoom: newZoom };
-    });
-
-    const fitToScreen = () => {
-        if (!info || !containerRef.current) return;
-        const initialZoom = getFitZoom();
-        // Animate instead of hard set for better feel
-        animateTo({ x: info.width / 2, y: info.height / 2, zoom: initialZoom });
-    };
-
     // Redraw when state changes
     useEffect(() => {
         requestAnimationFrame(draw);
@@ -572,51 +558,46 @@ export default function ImageViewer(props: ImageViewerProps) {
                 width: 120
             }} onMouseDown={e => e.stopPropagation()}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
-                    <Tooltip title="Zoom +" placement="right">
-                        <Button
-                            type="text"
-                            shape="circle"
-                            size="small"
-                            icon={<FiZoomIn size={16} />}
-                            onClick={() => zoomBy(1.25)}
-                            style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
-                        />
-                    </Tooltip>
-                    <div style={{ height: 110, padding: '6px 0' }}>
-                        <Slider
-                            vertical
-                            min={minZoom}
-                            max={1}
-                            step={0.01}
-                            value={viewState.zoom}
-                            onChange={(value: number) => setViewState(prev => ({ ...prev, zoom: Math.max(minZoom, Math.min(1, value)) }))}
-                            tooltip={{ formatter: (value: number | undefined) => `Zoom: ${Math.round((value || 0) * 100)}%`, placement: 'right' }}
-                            handleStyle={{ borderColor: '#1366FF', background: '#1366FF' }}
-                            trackStyle={{ backgroundColor: '#1366FF' }}
-                            railStyle={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
-                        />
-                    </div>
-                    <Tooltip title="Zoom -" placement="right">
-                        <Button
-                            type="text"
-                            shape="circle"
-                            size="small"
-                            icon={<FiZoomOut size={16} />}
-                            onClick={() => zoomBy(1 / 1.25)}
-                            style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
-                        />
-                    </Tooltip>
-                    <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.06)', margin: '6px 0' }} />
-                    <Tooltip title="Ajuster à l'écran" placement="right">
-                        <Button
-                            type="text"
-                            shape="circle"
-                            size="small"
-                            icon={<FiMaximize2 size={16} />}
-                            onClick={fitToScreen}
-                            style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
-                        />
-                    </Tooltip>
+                    <ToolbarOverlayItem
+                        panel={
+                            <div style={{
+                                height: 140,
+                                width: 44,
+                                padding: '10px 0',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: 'linear-gradient(180deg, rgba(20,22,25,0.95), rgba(14,15,17,0.9))',
+                                borderRadius: 10,
+                                backdropFilter: 'blur(10px)',
+                                border: '1px solid rgba(255,255,255,0.08)',
+                                boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
+                            }}>
+                                <Slider
+                                    vertical
+                                    min={minZoom}
+                                    max={1}
+                                    step={0.01}
+                                    value={viewState.zoom}
+                                    onChange={(value: number) => setViewState(prev => ({ ...prev, zoom: Math.max(minZoom, Math.min(1, value)) }))}
+                                    tooltip={{ formatter: (value: number | undefined) => `Zoom: ${Math.round((value || 0) * 100)}%`, placement: 'right' }}
+                                    handleStyle={{ borderColor: '#1366FF', background: '#1366FF' }}
+                                    trackStyle={{ backgroundColor: '#1366FF' }}
+                                    railStyle={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
+                                />
+                            </div>
+                        }
+                    >
+                        <Tooltip title="Zoom" placement="right">
+                            <Button
+                                type="text"
+                                shape="circle"
+                                size="small"
+                                icon={<FiZoomIn size={16} />}
+                                style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
+                            />
+                        </Tooltip>
+                    </ToolbarOverlayItem>
                 </div>
 
                 <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />
