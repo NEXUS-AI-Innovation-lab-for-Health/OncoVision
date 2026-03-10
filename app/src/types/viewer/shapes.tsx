@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import type { UUIDTypes } from "uuid";
+import type { Properties } from "../../components/viewers/canva";
 
 export interface Point {
     x: number;
@@ -6,6 +8,8 @@ export interface Point {
 }
 
 export abstract class Shape {
+
+    private readonly id: UUIDTypes = crypto.randomUUID();
     private readonly type: string;
 
     constructor(type: string) {
@@ -14,7 +18,15 @@ export abstract class Shape {
 
     abstract render(): ReactNode;
 
-    get getType(): string {
+    details(properties: Properties): Record<string, {label: ReactNode, value: ReactNode}> {
+        return {};
+    }
+
+    getId(): UUIDTypes {
+        return this.id;
+    }
+
+    getType(): string {
         return this.type;
     }
 
@@ -60,6 +72,7 @@ export interface Bordered {
 }
 
 export class Line extends Shape implements Bordered {
+
     start: Point;
     end: Point;
     borderColor: string;
@@ -90,9 +103,21 @@ export class Line extends Shape implements Bordered {
             />
         );
     }
+
+    details(properties: Properties): Record<string, {label: ReactNode, value: ReactNode}> {
+        const length = Math.sqrt(Math.pow(this.end.x - this.start.x, 2) + Math.pow(this.end.y - this.start.y, 2));
+        const unit = properties.canva.unit;
+        return {
+            length: {
+                label: "Longueur",
+                value: `${length.toFixed(2)} ${unit}`
+            }
+        };
+    }
 }
 
 export class Circle extends Shape implements Bordered {
+
     center: Point;
     radius: number;
     borderColor: string;
@@ -123,9 +148,25 @@ export class Circle extends Shape implements Bordered {
             />
         );
     }
+
+    details(properties: Properties): Record<string, {label: ReactNode, value: ReactNode}> {
+        const area = Math.PI * this.radius * this.radius;
+        const unit = properties.canva.unit;
+        return {
+            radius: {
+                label: "Rayon",
+                value: `${this.radius.toFixed(2)} ${unit}`
+            },
+            area: {
+                label: "Aire",
+                value: `${area.toFixed(2)} ${unit}²`
+            }
+        };
+    }
 }
 
 export class Ellipse extends Shape implements Bordered {
+
     center: Point;
     radiusX: number;
     radiusY: number;
@@ -159,9 +200,29 @@ export class Ellipse extends Shape implements Bordered {
             />
         );
     }
+
+    details(properties: Properties): Record<string, {label: ReactNode, value: ReactNode}> {
+        const area = this.radiusX * this.radiusY;
+        const unit = properties.canva.unit;
+        return {
+            radiusX: {
+                label: "Rayon X",
+                value: `${this.radiusX.toFixed(2)} ${unit}`
+            },
+            radiusY: {
+                label: "Rayon Y",
+                value: `${this.radiusY.toFixed(2)} ${unit}`
+            },
+            area: {
+                label: "Aire",
+                value: `${area.toFixed(2)} ${unit}²`
+            }
+        };
+    }
 }
 
 export class Rectangle extends Shape implements Bordered {
+
     origin: Point;
     width: number;
     height: number;
@@ -195,6 +256,25 @@ export class Rectangle extends Shape implements Bordered {
             />
         );
     }
+
+    details(properties: Properties): Record<string, {label: ReactNode, value: ReactNode}> {
+        const area = this.width * this.height;
+        const unit = properties.canva.unit;
+        return {
+            width: {
+                label: "Largeur",
+                value: `${this.width.toFixed(2)} ${unit}`
+            },
+            height: {
+                label: "Hauteur",
+                value: `${this.height.toFixed(2)} ${unit}`
+            },
+            area: {
+                label: "Aire",
+                value: `${area.toFixed(2)} ${unit}²`
+            }
+        };
+    }
 }
 
 export class Polygon extends Shape implements Bordered {
@@ -218,9 +298,37 @@ export class Polygon extends Shape implements Bordered {
         const pointsStr = this.points.map((p) => `${p.x},${p.y}`).join(" ");
         return <polygon points={pointsStr} stroke={this.borderColor} strokeWidth={this.borderWidth} fill="none" />;
     }
+
+    calculateArea(): number {
+        // Using the shoelace formula
+        let area = 0;
+        const n = this.points.length;
+        for (let i = 0; i < n; i++) {
+            const j = (i + 1) % n;
+            area += this.points[i].x * this.points[j].y;
+            area -= this.points[j].x * this.points[i].y;
+        }
+        return Math.abs(area / 2);
+    }
+
+    details(properties: Properties): Record<string, {label: ReactNode, value: ReactNode}> {
+        const area = this.points.length > 2 ? this.calculateArea() : 0;
+        const unit = properties.canva.unit;
+        return {
+            points: {
+                label: "Points",
+                value: `${this.points.length}`
+            },
+            area: {
+                label: "Aire",
+                value: `${area.toFixed(2)} ${unit}²`
+            }
+        };
+    }
 }
 
 export class Polyline extends Shape implements Bordered {
+    
     points: Point[];
     borderColor: string;
     borderWidth: number;
@@ -240,5 +348,24 @@ export class Polyline extends Shape implements Bordered {
     render(): ReactNode {
         const pointsStr = this.points.map((p) => `${p.x},${p.y}`).join(" ");
         return <polyline points={pointsStr} stroke={this.borderColor} strokeWidth={this.borderWidth} fill="none" />;
+    }
+
+    details(properties: Properties): Record<string, {label: ReactNode, value: ReactNode}> {
+        const length = this.points.reduce((acc, p, i) => {
+            if (i === 0) return acc;
+            const prev = this.points[i - 1];
+            return acc + Math.hypot(p.x - prev.x, p.y - prev.y);
+        }, 0);
+        const unit = properties.canva.unit;
+        return {
+            points: {
+                label: "Points",
+                value: `${this.points.length}`
+            },
+            length: {
+                label: "Longueur",
+                value: `${length.toFixed(2)} ${unit}`
+            }
+        };
     }
 }

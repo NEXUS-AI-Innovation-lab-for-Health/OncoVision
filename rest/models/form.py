@@ -1,4 +1,5 @@
 from api.model import CamelModel
+from uuid import UUID
 from typing import Union, Annotated, Literal
 from pydantic import Field
 
@@ -7,6 +8,7 @@ class Point(CamelModel):
     y: float
 
 class Shape(CamelModel):
+    id: UUID
     type: str
 
 class Bordered(CamelModel):

@@ -1,7 +1,7 @@
 import { Slider, Button, Tooltip } from "antd";
 import { FiZoomIn } from "react-icons/fi";
 import type { Dispatch, SetStateAction } from "react";
-import type { CanvaProps, CanvaTool, CanvaViewState, ShapeProperties } from "../canva";
+import type { CanvaProps, CanvaTool, CanvaViewState, Properties } from "../canva";
 import ToolbarItem from "./item";
 
 import { FaRedo } from "react-icons/fa";
@@ -9,12 +9,12 @@ import { FaUndo } from "react-icons/fa";
 import { CiSettings } from "react-icons/ci";
 import { CiZoomIn } from "react-icons/ci";
 import { CiZoomOut } from "react-icons/ci";
-import ToolSettings from "./setting";  // now expects setShapeProperties prop
+import ToolSettings from "./setting";  // now expects setProperties prop
 
 interface ToolbarProps {
     canva: CanvaProps;
     setActiveTool: Dispatch<SetStateAction<CanvaTool>>;
-    setShapeProperties: Dispatch<SetStateAction<ShapeProperties>>;
+    setProperties: Dispatch<SetStateAction<Properties>>;
     setViewState: Dispatch<SetStateAction<CanvaViewState>>;
     minZoom: number;
 }
@@ -72,7 +72,7 @@ const ToolIcon = ({ name, size = 14 }: { name: string; size?: number }) => {
 
 export default function Toolbar(props: ToolbarProps) {
 
-    const { canva, setActiveTool, setShapeProperties: _setShapeProperties, setViewState, minZoom } = props;
+    const { canva, setActiveTool, setProperties: _setProperties, setViewState, minZoom } = props;
     const { activeTool, viewState } = canva;
     const zoom = viewState.zoom;
 
@@ -232,7 +232,7 @@ export default function Toolbar(props: ToolbarProps) {
 
                 <ToolbarItem
                     panel={
-                        <ToolSettings canva={canva} setShapeProperties={_setShapeProperties} />
+                        <ToolSettings canva={canva} setProperties={_setProperties} />
                     }
                 >
                     <Button

@@ -3,8 +3,8 @@ import { useRest } from "../../hooks/rest";
 import Toolbar from "./tool/bar";
 import ImagePreview from "./preview"; // New import
 import Canva from "./canva";
-import type { CanvaHandle, CanvaTool, CanvaProps, ShapeProperties } from "./canva";
-import { DEFAULT_SHAPE_PROPERTIES } from "./canva";
+import type { CanvaHandle, CanvaTool, CanvaProps, Properties } from "./canva";
+import { DEFAULT_PROPERTIES } from "./canva";
 
 interface ImageViewerProps {
     imageId: string;
@@ -77,7 +77,7 @@ export default function ImageViewer(props: ImageViewerProps) {
     const [isDrawingActive, setIsDrawingActive] = useState(false);
     const [canvasSize, setCanvasSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
     const [activeTool, setActiveTool] = useState<CanvaTool>("pan");
-    const [shapeProperties, setShapeProperties] = useState<ShapeProperties>(DEFAULT_SHAPE_PROPERTIES);
+    const [properties, setProperties] = useState<Properties>(DEFAULT_PROPERTIES);
 
     const getFitZoom = useCallback(() => {
         if (!infoRef.current || !containerRef.current) return 0.001;
@@ -461,7 +461,7 @@ export default function ImageViewer(props: ImageViewerProps) {
         width: canvasSize.w,
         height: canvasSize.h,
         activeTool,
-        shapeProperties,
+        properties,
         onDrawingActiveChange: setIsDrawingActive,
         imageWidth: info.width,
         imageHeight: info.height,
@@ -486,7 +486,7 @@ export default function ImageViewer(props: ImageViewerProps) {
             <Toolbar
                 canva={defaultCanvaProps}
                 setActiveTool={setActiveTool}
-                setShapeProperties={setShapeProperties}
+                setProperties={setProperties}
                 setViewState={setViewState}
                 minZoom={minZoom}
             />

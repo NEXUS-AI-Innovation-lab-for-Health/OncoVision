@@ -1,21 +1,23 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent, Dispatch, SetStateAction } from "react";
-import { Slider, InputNumber } from "antd";
-import type { CanvaProps, ShapeProperties } from "../canva";
-import { DEFAULT_SHAPE_PROPERTIES } from "../canva";
+import { Slider, InputNumber, Select } from "antd";
+import type { CanvaProps, Properties, MeterUnit } from "../canva";
+import { DEFAULT_PROPERTIES } from "../canva";
 
 export type ToolSettingsProps = {
     canva: CanvaProps;
-    setShapeProperties: Dispatch<SetStateAction<ShapeProperties>>;
+    setProperties: Dispatch<SetStateAction<Properties>>;
 }
 
 export default function ToolSettings(props: ToolSettingsProps) {
 
-    const { canva, setShapeProperties } = props;
-    // make local copies so the slider/input feel responsive
-    const currentStroke = canva.shapeProperties?.stroke ?? DEFAULT_SHAPE_PROPERTIES.stroke;
+    const { canva, setProperties } = props;
+    // local copies
+    const currentStroke = canva.properties?.shape.strike ?? DEFAULT_PROPERTIES.shape.strike;
+    const currentUnit: MeterUnit = canva.properties?.canva.unit ?? DEFAULT_PROPERTIES.canva.unit;
     const [color, setColor] = useState<string>(currentStroke.color);
     const [width, setWidth] = useState<number>(currentStroke.width);
+    const [unit, setUnit] = useState<MeterUnit>(currentUnit);
 
     // keep local state in sync when parent changes the properties externally
     useEffect(() => {
@@ -23,12 +25,30 @@ export default function ToolSettings(props: ToolSettingsProps) {
         setWidth(currentStroke.width);
     }, [currentStroke]);
 
+    useEffect(() => {
+        setUnit(currentUnit);
+    }, [currentUnit]);
+
     const updateStroke = (newColor: string, newWidth: number) => {
-        setShapeProperties((prev) => ({
+        setProperties((prev) => ({
             ...prev,
-            stroke: {
-                color: newColor,
-                width: newWidth,
+            shape: {
+                ...prev.shape,
+                strike: {
+                    color: newColor,
+                    width: newWidth,
+                },
+            },
+        }));
+    };
+
+    const onUnitChange = (newUnit: MeterUnit) => {
+        setUnit(newUnit);
+        setProperties((prev) => ({
+            ...prev,
+            canva: {
+                ...prev.canva,
+                unit: newUnit,
             },
         }));
     };
@@ -59,6 +79,21 @@ export default function ToolSettings(props: ToolSettingsProps) {
                 </div>
 
                 <div>
+                    <label style={{ display: "block", marginBottom: 4 }}>Unité</label>
+                    <Select<MeterUnit>
+                        value={unit}
+                        onChange={onUnitChange}
+                        options={[
+                            { label: "px", value: "px" },
+                            { label: "mm", value: "mm" },
+                            { label: "µm", value: "µm" },
+                            { label: "nm", value: "nm" },
+                        ]}
+                        style={{ width: "100%" }}
+                    />
+                </div>
+
+                <div>
                     <label style={{ display: "block", marginBottom: 4 }}>Épaisseur</label>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <Slider
@@ -67,7 +102,7 @@ export default function ToolSettings(props: ToolSettingsProps) {
                             step={1}
                             value={width}
                             onChange={onWidthChange}
-                            tooltip={{ formatter: (v) => `${v}px` }}
+                            tooltip={{ formatter: (v) => `${v}${unit}` }}
                             style={{ flex: 1 }}
                         />
                         <InputNumber
@@ -76,6 +111,8 @@ export default function ToolSettings(props: ToolSettingsProps) {
                             value={width}
                             onChange={onWidthChange}
                             size="small"
+                            formatter={v => `${v}${unit}`}
+                            parser={v => v ? parseFloat(v.replace(unit, "")) : 0}
                             style={{ width: 64 }}
                         />
                     </div>

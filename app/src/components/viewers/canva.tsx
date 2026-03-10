@@ -10,7 +10,7 @@ import {
     RectangleCursor,
 } from "../../types/viewer/cursors";
 import type { CursorBoundingBox, CursorType } from "../../types/viewer/cursors";
-import { Shape } from "../../types/viewer/shapes";
+import { Circle, Ellipse, Line, Polygon, Polyline, Rectangle, Shape } from "../../types/viewer/shapes";
 import type { Point } from "../../types/viewer/shapes";
 
 export type CanvaTool = "pan" | CursorType;
@@ -21,17 +21,31 @@ export interface CanvaViewState {
     zoom: number;
 }
 
-export interface ShapeProperties {
-    stroke: {
-        color: string;
-        width: number;
+export type MeterUnit = "px" | "mm" | "µm" | "nm";
+
+export interface Properties {
+    canva: {
+        unit: MeterUnit;
+    };
+    shape: {
+        details: boolean;
+        strike: {
+            color: string;
+            width: number;
+        };
     };
 }
 
-export const DEFAULT_SHAPE_PROPERTIES: ShapeProperties = {
-    stroke: {
-        color: "#ff3b30",
-        width: 2,
+export const DEFAULT_PROPERTIES: Properties = {
+    canva: {
+        unit: "px",
+    },
+    shape: {
+        details: true,
+        strike: {
+            color: "#ff3b30",
+            width: 2,
+        },
     },
 };
 
@@ -40,7 +54,7 @@ export type CanvaProps = {
     width: number;
     height: number;
     activeTool?: CanvaTool;
-    shapeProperties?: ShapeProperties;
+    properties?: Properties;
     initialShapes?: Shape[];
     onShapeCreated?: (shape: Shape) => void;
     onDrawingActiveChange?: (active: boolean) => void;
@@ -62,7 +76,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     width,
     height,
     activeTool,
-    shapeProperties = DEFAULT_SHAPE_PROPERTIES,
+    properties = DEFAULT_PROPERTIES,
     initialShapes = [],
     onShapeCreated,
     onDrawingActiveChange,
@@ -74,6 +88,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     const [internalTool] = useState<CanvaTool>("pan");
     const resolvedTool = activeTool ?? internalTool;
     const cursorRef = useRef<DrawingCursor | null>(null);
+    const cursorWorldPosRef = useRef<Point | null>(null);
     const [shapes, setShapes] = useState<Shape[]>(initialShapes);
     const [previewShape, setPreviewShape] = useState<Shape | null>(null);
     const [isDrawing, setIsDrawing] = useState(false);
@@ -95,7 +110,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
             return;
         }
 
-        const { color, width: strokeWidth } = shapeProperties.stroke;
+        const { color, width: strokeWidth } = properties.shape.strike;
 
         const createCursor = (tool: CursorType): DrawingCursor => {
             switch (tool) {
@@ -120,7 +135,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         setPreviewShape(null);
         setIsDrawing(false);
         onDrawingActiveChange?.(false);
-    }, [resolvedTool, shapeProperties, imageWidth, imageHeight]);
+    }, [resolvedTool, properties, imageWidth, imageHeight]);
 
     const addShape = (shape: Shape) => {
         setShapes((prev) => {
@@ -206,6 +221,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     };
 
     const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+        cursorWorldPosRef.current = toImagePoint(e);
         // If not drawing, update cursor feedback to indicate writable area
         if (!isDrawing || !cursorRef.current) {
             if (resolvedTool !== "pan") {
@@ -267,6 +283,193 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
 
     const canRenderSvg = width > 0 && height > 0;
 
+    const getVisibleWorldBounds = () => {
+        const halfW = width / (2 * viewState.zoom);
+        const halfH = height / (2 * viewState.zoom);
+        return {
+            minX: viewState.x - halfW,
+            maxX: viewState.x + halfW,
+            minY: viewState.y - halfH,
+            maxY: viewState.y + halfH,
+        };
+    };
+
+    const getShapeBBox = (shape: Shape): { minX: number; maxX: number; minY: number; maxY: number } | null => {
+        if (shape instanceof Line) {
+            return {
+                minX: Math.min(shape.start.x, shape.end.x),
+                maxX: Math.max(shape.start.x, shape.end.x),
+                minY: Math.min(shape.start.y, shape.end.y),
+                maxY: Math.max(shape.start.y, shape.end.y),
+            };
+        }
+        if (shape instanceof Circle) {
+            return {
+                minX: shape.center.x - shape.radius,
+                maxX: shape.center.x + shape.radius,
+                minY: shape.center.y - shape.radius,
+                maxY: shape.center.y + shape.radius,
+            };
+        }
+        if (shape instanceof Ellipse) {
+            return {
+                minX: shape.center.x - shape.radiusX,
+                maxX: shape.center.x + shape.radiusX,
+                minY: shape.center.y - shape.radiusY,
+                maxY: shape.center.y + shape.radiusY,
+            };
+        }
+        if (shape instanceof Rectangle) {
+            return {
+                minX: shape.origin.x,
+                maxX: shape.origin.x + shape.width,
+                minY: shape.origin.y,
+                maxY: shape.origin.y + shape.height,
+            };
+        }
+        if (shape instanceof Polygon || shape instanceof Polyline) {
+            if (!shape.points.length) return null;
+            const xs = shape.points.map((p) => p.x);
+            const ys = shape.points.map((p) => p.y);
+            return {
+                minX: Math.min(...xs),
+                maxX: Math.max(...xs),
+                minY: Math.min(...ys),
+                maxY: Math.max(...ys),
+            };
+        }
+        return null;
+    };
+
+    const getShapeAnchor = (shape: Shape): Point | null => {
+        if (shape instanceof Line) {
+            return {
+                x: Math.max(shape.start.x, shape.end.x),
+                y: Math.min(shape.start.y, shape.end.y),
+            };
+        }
+        if (shape instanceof Circle) {
+            return {
+                x: shape.center.x + shape.radius,
+                y: shape.center.y - shape.radius,
+            };
+        }
+        if (shape instanceof Ellipse) {
+            return {
+                x: shape.center.x + shape.radiusX,
+                y: shape.center.y - shape.radiusY,
+            };
+        }
+        if (shape instanceof Rectangle) {
+            return {
+                x: shape.origin.x + shape.width,
+                y: shape.origin.y,
+            };
+        }
+        if (shape instanceof Polygon || shape instanceof Polyline) {
+            if (!shape.points.length) return null;
+            const xs = shape.points.map((p) => p.x);
+            const ys = shape.points.map((p) => p.y);
+            return {
+                x: Math.max(...xs),
+                y: Math.min(...ys),
+            };
+        }
+
+        return null;
+    };
+
+    const renderShapeDetails = (shape: Shape, idx: number) => {
+        if (!properties.shape.details) return null;
+
+        const details = shape.details(properties);
+        const detailEntries = Object.values(details);
+        if (!detailEntries.length) return null;
+
+        const anchor = getShapeAnchor(shape);
+        if (!anchor) return null;
+
+        const visible = getVisibleWorldBounds();
+        const bbox = getShapeBBox(shape);
+        if (!bbox) return null;
+        const shapeVisible =
+            bbox.maxX >= visible.minX &&
+            bbox.minX <= visible.maxX &&
+            bbox.maxY >= visible.minY &&
+            bbox.minY <= visible.maxY;
+        if (!shapeVisible) return null;
+
+        const pad = 5;
+        const lineH = 12;
+        const titleH = 13;
+        const sepH = 3;
+        const boxW = 118;
+        const boxH = pad + titleH + sepH + detailEntries.length * lineH + pad;
+
+        const desiredX = anchor.x + 5;
+        const desiredY = anchor.y - boxH / 2;
+        const lx = Math.max(visible.minX + 4, Math.min(desiredX, visible.maxX - boxW - 4));
+        const ly = Math.max(visible.minY + 4, Math.min(desiredY, visible.maxY - boxH - 4));
+
+        if (isDrawing && cursorWorldPosRef.current) {
+            const { x: cx, y: cy } = cursorWorldPosRef.current;
+            const margin = 12 / viewState.zoom;
+            if (cx >= lx - margin && cx <= lx + boxW + margin && cy >= ly - margin && cy <= ly + boxH + margin) {
+                return null;
+            }
+        }
+
+        return (
+            <g key={`shape-details-${idx}`} pointerEvents="none" style={{ userSelect: "none" }}>
+                <rect
+                    x={lx}
+                    y={ly}
+                    width={boxW}
+                    height={boxH}
+                    fill="rgba(20, 22, 25, 0.96)"
+                    stroke="rgba(255, 255, 255, 0.08)"
+                    strokeWidth={0.6}
+                    rx={5}
+                    ry={5}
+                    filter="url(#shape-detail-shadow)"
+                />
+                <text
+                    x={lx + pad}
+                    y={ly + pad + 9}
+                    fill="rgba(255,255,255,0.38)"
+                    fontSize={7}
+                    fontWeight={700}
+                    fontFamily="system-ui, sans-serif"
+                    letterSpacing={0.9}
+                    style={{ userSelect: "none" }}
+                >
+                    {shape.getType().toUpperCase()}
+                </text>
+                <line
+                    x1={lx + pad}
+                    y1={ly + pad + titleH}
+                    x2={lx + boxW - pad}
+                    y2={ly + pad + titleH}
+                    stroke="rgba(255,255,255,0.07)"
+                    strokeWidth={0.5}
+                />
+                {detailEntries.map((entry, detailIdx) => (
+                    <text
+                        key={`shape-detail-line-${idx}-${detailIdx}`}
+                        x={lx + pad}
+                        y={ly + pad + titleH + sepH + (detailIdx + 1) * lineH - 2}
+                        fontSize={9}
+                        fontFamily="system-ui, sans-serif"
+                        style={{ userSelect: "none" }}
+                    >
+                        <tspan fill="rgba(141,179,255,0.75)" fontWeight={500}>{entry.label}: </tspan>
+                        <tspan fill="rgba(255,255,255,0.85)">{entry.value}</tspan>
+                    </text>
+                ))}
+            </g>
+        );
+    };
+
     return (
         <>
             {canRenderSvg && (
@@ -284,12 +487,18 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                     onPointerCancel={handlePointerCancel}
                     onDoubleClick={handleDoubleClick}
                 >
+                    <defs>
+                        <filter id="shape-detail-shadow" x="-30%" y="-30%" width="160%" height="160%">
+                            <feDropShadow dx="0" dy="3" stdDeviation="5" floodColor="rgba(0,0,0,0.7)" floodOpacity="1" />
+                        </filter>
+                    </defs>
                     <g
                         transform={`translate(${width / 2}, ${height / 2}) scale(${viewState.zoom}) translate(${-viewState.x}, ${-viewState.y})`}
                     >
                         {shapes.map((shape, idx) => (
                             <g key={`shape-${idx}`}>{shape.render()}</g>
                         ))}
+                        {shapes.map((shape, idx) => renderShapeDetails(shape, idx))}
                         {previewShape && <g opacity={0.7}>{previewShape.render()}</g>}
                     </g>
                 </svg>
