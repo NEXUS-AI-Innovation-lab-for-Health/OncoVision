@@ -21,13 +21,26 @@ export interface CanvaViewState {
     zoom: number;
 }
 
+export interface ShapeProperties {
+    stroke: {
+        color: string;
+        width: number;
+    };
+}
+
+export const DEFAULT_SHAPE_PROPERTIES: ShapeProperties = {
+    stroke: {
+        color: "#ff3b30",
+        width: 2,
+    },
+};
+
 export type CanvaProps = {
     viewState: CanvaViewState;
     width: number;
     height: number;
     activeTool?: CanvaTool;
-    strokeColor?: string;
-    strokeWidth?: number;
+    shapeProperties?: ShapeProperties;
     initialShapes?: Shape[];
     onShapeCreated?: (shape: Shape) => void;
     onDrawingActiveChange?: (active: boolean) => void;
@@ -49,8 +62,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     width,
     height,
     activeTool,
-    strokeColor = "#ff3b30",
-    strokeWidth = 2,
+    shapeProperties = DEFAULT_SHAPE_PROPERTIES,
     initialShapes = [],
     onShapeCreated,
     onDrawingActiveChange,
@@ -58,6 +70,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     imageHeight,
     children,
 }: CanvaProps, ref) {
+
     const [internalTool] = useState<CanvaTool>("pan");
     const resolvedTool = activeTool ?? internalTool;
     const cursorRef = useRef<DrawingCursor | null>(null);
@@ -82,22 +95,24 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
             return;
         }
 
+        const { color, width: strokeWidth } = shapeProperties.stroke;
+
         const createCursor = (tool: CursorType): DrawingCursor => {
             switch (tool) {
                 case "line":
-                    return new LineCursor(strokeColor, strokeWidth);
+                    return new LineCursor(color, strokeWidth);
                 case "pensil":
-                    return new PensilCursor(strokeColor, strokeWidth);
+                    return new PensilCursor(color, strokeWidth);
                 case "circle":
-                    return new CircleCursor(strokeColor, strokeWidth);
+                    return new CircleCursor(color, strokeWidth);
                 case "ellipse":
-                    return new EllipseCursor(strokeColor, strokeWidth);
+                    return new EllipseCursor(color, strokeWidth);
                 case "rectangle":
-                    return new RectangleCursor(strokeColor, strokeWidth);
+                    return new RectangleCursor(color, strokeWidth);
                 case "polygon":
-                    return new PolygonCursor(strokeColor, strokeWidth);
+                    return new PolygonCursor(color, strokeWidth);
                 default:
-                    return new LineCursor(strokeColor, strokeWidth);
+                    return new LineCursor(color, strokeWidth);
             }
         };
 
@@ -105,7 +120,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         setPreviewShape(null);
         setIsDrawing(false);
         onDrawingActiveChange?.(false);
-    }, [resolvedTool, strokeColor, strokeWidth, imageWidth, imageHeight]);
+    }, [resolvedTool, shapeProperties, imageWidth, imageHeight]);
 
     const addShape = (shape: Shape) => {
         setShapes((prev) => {

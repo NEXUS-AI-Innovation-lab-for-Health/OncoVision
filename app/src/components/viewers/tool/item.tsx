@@ -60,6 +60,11 @@ export default function ToolbarItem({ children, panel }: ToolbarItemProps) {
                         top: 0,
                         left: "calc(100% + 16px)",
                         zIndex: 320,
+                        background: "linear-gradient(180deg, rgba(20,22,25,0.95), rgba(14,15,17,0.9))",
+                        borderRadius: 10,
+                        backdropFilter: "blur(10px)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        boxShadow: "0 10px 30px rgba(0,0,0,0.6)",
                     }}
                 >
                     {panel}

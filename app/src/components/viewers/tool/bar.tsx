@@ -1,7 +1,7 @@
 import { Slider, Button, Tooltip } from "antd";
 import { FiZoomIn } from "react-icons/fi";
 import type { Dispatch, SetStateAction } from "react";
-import type { CanvaTool } from "../canva";
+import type { CanvaProps, CanvaTool, CanvaViewState, ShapeProperties } from "../canva";
 import ToolbarItem from "./item";
 
 import { FaRedo } from "react-icons/fa";
@@ -9,19 +9,14 @@ import { FaUndo } from "react-icons/fa";
 import { CiSettings } from "react-icons/ci";
 import { CiZoomIn } from "react-icons/ci";
 import { CiZoomOut } from "react-icons/ci";
-
-interface ViewState {
-    x: number;
-    y: number;
-    zoom: number;
-}
+import ToolSettings from "./setting";
 
 interface ToolbarProps {
-    activeTool: CanvaTool;
+    canva: CanvaProps;
     setActiveTool: Dispatch<SetStateAction<CanvaTool>>;
+    setShapeProperties: Dispatch<SetStateAction<ShapeProperties>>;
+    setViewState: Dispatch<SetStateAction<CanvaViewState>>;
     minZoom: number;
-    zoom: number;
-    setViewState: Dispatch<SetStateAction<ViewState>>;
 }
 
 const ToolIcon = ({ name, size = 14 }: { name: string; size?: number }) => {
@@ -75,7 +70,12 @@ const ToolIcon = ({ name, size = 14 }: { name: string; size?: number }) => {
     }
 };
 
-export default function Toolbar({ activeTool, setActiveTool, minZoom, zoom, setViewState }: ToolbarProps) {
+export default function Toolbar(props: ToolbarProps) {
+
+    const { canva, setActiveTool, setShapeProperties: _setShapeProperties, setViewState, minZoom } = props;
+    const { activeTool, viewState } = canva;
+    const zoom = viewState.zoom;
+
     return (
         <div
             style={{
@@ -110,11 +110,6 @@ export default function Toolbar({ activeTool, setActiveTool, minZoom, zoom, setV
                                 alignItems: "center",
                                 justifyContent: "center",
                                 gap: 6,
-                                background: "linear-gradient(180deg, rgba(20,22,25,0.95), rgba(14,15,17,0.9))",
-                                borderRadius: 10,
-                                backdropFilter: "blur(10px)",
-                                border: "1px solid rgba(255,255,255,0.08)",
-                                boxShadow: "0 10px 30px rgba(0,0,0,0.6)",
                             }}
                         >
                             <Button
@@ -235,14 +230,20 @@ export default function Toolbar({ activeTool, setActiveTool, minZoom, zoom, setV
                     Polygone
                 </Button>
 
-                <Button
-                    type="text"
-                    size="small"
-                    icon={<CiSettings size={16} />}
-                    style={{ color: "white", background: "transparent", border: "none", borderRadius: 8, display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-start", padding: "6px 10px" }}
+                <ToolbarItem
+                    panel={
+                        <ToolSettings canva={canva} />
+                    }
                 >
-                    Réglages
-                </Button>
+                    <Button
+                        type="text"
+                        size="small"
+                        icon={<CiSettings size={16} />}
+                        style={{ color: "white", background: "transparent", border: "none", borderRadius: 8, display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-start", padding: "6px 10px" }}
+                    >
+                        Réglages
+                    </Button>
+                </ToolbarItem>
 
                 <div style={{ display: "flex", justifyContent: "center", gap: 8, width: "100%" }}>
                     <Tooltip
