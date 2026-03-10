@@ -463,6 +463,7 @@ export default function ImageViewer(props: ImageViewerProps) {
         activeTool,
         properties,
         onDrawingActiveChange: setIsDrawingActive,
+        onViewStateChange: setViewState,
         imageWidth: info.width,
         imageHeight: info.height,
     };

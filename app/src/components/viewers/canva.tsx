@@ -60,6 +60,7 @@ export type CanvaProps = {
     initialShapes?: Shape[];
     onShapeCreated?: (shape: Shape) => void;
     onDrawingActiveChange?: (active: boolean) => void;
+    onViewStateChange?: (updater: (prev: CanvaViewState) => CanvaViewState) => void;
     // Optional image bounds (in image pixel coordinates). If provided, drawing is limited to these bounds.
     imageWidth?: number;
     imageHeight?: number;
@@ -81,8 +82,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     properties = DEFAULT_PROPERTIES,
     initialShapes = [],
     onShapeCreated,
-    onDrawingActiveChange,
-    imageWidth,
+    onDrawingActiveChange,    onViewStateChange,    imageWidth,
     imageHeight,
     children,
 }: CanvaProps, ref) {
@@ -98,6 +98,8 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     const [movingShapeId, setMovingShapeId] = useState<string | null>(null);
     const moveStartRef = useRef<{ shapeId: string; pointerId: number; startPoint: Point; original: Shape; svg: SVGSVGElement } | null>(null);
     const moveCleanupRef = useRef<(() => void) | null>(null);
+    const onViewStateChangeRef = useRef(onViewStateChange);
+    useEffect(() => { onViewStateChangeRef.current = onViewStateChange; }, [onViewStateChange]);
     const [hoveredInfo, setHoveredInfo] = useState<null | {
         idx: number;
         box: { x: number; y: number; w: number; h: number };
@@ -216,12 +218,34 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         setMovingShapeId(shapeId);
         setSelectedShapeIds(new Set([shapeId]));
 
-        const onMove = (ev: PointerEvent) => {
-            if (ev.pointerId !== pointerId) return;
-            const pt = toImagePointFromClient(ev.clientX, ev.clientY, svg);
-            const dx = pt.x - startPoint.x;
-            const dy = pt.y - startPoint.y;
-            // Mutate shape in-place (avoids clone with new UUID that breaks id tracking)
+        // Tracks the latest pointer client position for the autopan RAF loop
+        const latestClientPos = { x: e.clientX, y: e.clientY };
+        let rafId = 0;
+
+        // Compute original shape bbox once for clamping
+        const origBBox: { minX: number; maxX: number; minY: number; maxY: number } | null = (() => {
+            if (original instanceof Line) return { minX: Math.min(original.start.x, original.end.x), maxX: Math.max(original.start.x, original.end.x), minY: Math.min(original.start.y, original.end.y), maxY: Math.max(original.start.y, original.end.y) };
+            if (original instanceof Circle) return { minX: original.center.x - original.radius, maxX: original.center.x + original.radius, minY: original.center.y - original.radius, maxY: original.center.y + original.radius };
+            if (original instanceof Ellipse) return { minX: original.center.x - original.radiusX, maxX: original.center.x + original.radiusX, minY: original.center.y - original.radiusY, maxY: original.center.y + original.radiusY };
+            if (original instanceof Rectangle) return { minX: original.origin.x, maxX: original.origin.x + original.width, minY: original.origin.y, maxY: original.origin.y + original.height };
+            if ((original instanceof Polygon || original instanceof Polyline) && original.points.length) {
+                const xs = original.points.map((p) => p.x);
+                const ys = original.points.map((p) => p.y);
+                return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+            }
+            return null;
+        })();
+
+        const clampDelta = (dx: number, dy: number): { dx: number; dy: number } => {
+            if (!origBBox || !imageWidth || !imageHeight) return { dx, dy };
+            return {
+                dx: Math.max(-origBBox.minX, Math.min(imageWidth - origBBox.maxX, dx)),
+                dy: Math.max(-origBBox.minY, Math.min(imageHeight - origBBox.maxY, dy)),
+            };
+        };
+
+        const applyShapeOffset = (rawDx: number, rawDy: number) => {
+            const { dx, dy } = clampDelta(rawDx, rawDy);
             if (shape instanceof Line && original instanceof Line) {
                 shape.start = { x: original.start.x + dx, y: original.start.y + dy };
                 shape.end = { x: original.end.x + dx, y: original.end.y + dy };
@@ -234,8 +258,64 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
             } else if ((shape instanceof Polygon || shape instanceof Polyline) && (original instanceof Polygon || original instanceof Polyline)) {
                 shape.points = original.points.map((p) => ({ x: p.x + dx, y: p.y + dy }));
             }
+        };
+
+        const onMove = (ev: PointerEvent) => {
+            if (ev.pointerId !== pointerId) return;
+            latestClientPos.x = ev.clientX;
+            latestClientPos.y = ev.clientY;
+            const pt = toImagePointFromClient(ev.clientX, ev.clientY, svg);
+            applyShapeOffset(pt.x - startPoint.x, pt.y - startPoint.y);
             setShapes((prev) => [...prev]);
         };
+
+        // Edge-scroll: pan the view when the pointer is near a border during a shape drag
+        const EDGE_ZONE = 60; // px from border
+        const MAX_SPEED = 12; // image-space px per frame at full edge
+        const autopan = () => {
+            if (!moveStartRef.current) return;
+            const svgRect = svg.getBoundingClientRect();
+            const cx = latestClientPos.x;
+            const cy = latestClientPos.y;
+            const { zoom } = viewStateRef.current;
+
+            let panDx = 0;
+            let panDy = 0;
+
+            const distLeft   = cx - svgRect.left;
+            const distRight  = svgRect.right - cx;
+            const distTop    = cy - svgRect.top;
+            const distBottom = svgRect.bottom - cy;
+
+            if (distLeft   < EDGE_ZONE) panDx = -MAX_SPEED * (1 - distLeft   / EDGE_ZONE) / zoom;
+            if (distRight  < EDGE_ZONE) panDx =  MAX_SPEED * (1 - distRight  / EDGE_ZONE) / zoom;
+            if (distTop    < EDGE_ZONE) panDy = -MAX_SPEED * (1 - distTop    / EDGE_ZONE) / zoom;
+            if (distBottom < EDGE_ZONE) panDy =  MAX_SPEED * (1 - distBottom / EDGE_ZONE) / zoom;
+
+            // Don't pan toward a wall the shape is already against
+            if (origBBox && imageWidth && imageHeight) {
+                const pt = toImagePointFromClient(cx, cy, svg);
+                const rawDx = pt.x - startPoint.x;
+                const rawDy = pt.y - startPoint.y;
+                if (panDx < 0 && rawDx <= -origBBox.minX)            panDx = 0;
+                if (panDx > 0 && rawDx >= imageWidth - origBBox.maxX)  panDx = 0;
+                if (panDy < 0 && rawDy <= -origBBox.minY)            panDy = 0;
+                if (panDy > 0 && rawDy >= imageHeight - origBBox.maxY) panDy = 0;
+            }
+
+            if ((panDx !== 0 || panDy !== 0) && onViewStateChangeRef.current) {
+                onViewStateChangeRef.current((prev) => ({ ...prev, x: prev.x + panDx, y: prev.y + panDy }));
+                // Shift the drag origin so the shape follows without snapping back
+                startPoint.x += panDx;
+                startPoint.y += panDy;
+                const pt = toImagePointFromClient(latestClientPos.x, latestClientPos.y, svg);
+                applyShapeOffset(pt.x - startPoint.x, pt.y - startPoint.y);
+                setShapes((prev) => [...prev]);
+            }
+
+            rafId = requestAnimationFrame(autopan);
+        };
+        rafId = requestAnimationFrame(autopan);
 
         const onEnd = (ev: PointerEvent) => {
             if (ev.pointerId !== pointerId) return;
@@ -243,6 +323,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         };
 
         const cleanup = () => {
+            cancelAnimationFrame(rafId);
             document.removeEventListener("pointermove", onMove);
             document.removeEventListener("pointerup", onEnd);
             document.removeEventListener("pointercancel", onEnd);
