@@ -4,6 +4,12 @@ import type { Dispatch, SetStateAction } from "react";
 import type { CanvaTool } from "../canva";
 import ToolbarItem from "./item";
 
+import { FaRedo } from "react-icons/fa";
+import { FaUndo } from "react-icons/fa";
+import { CiSettings } from "react-icons/ci";
+import { CiZoomIn } from "react-icons/ci";
+import { CiZoomOut } from "react-icons/ci";
+
 interface ViewState {
     x: number;
     y: number;
@@ -18,7 +24,6 @@ interface ToolbarProps {
     setViewState: Dispatch<SetStateAction<ViewState>>;
 }
 
-// Small inline icons to avoid extra dependencies and ensure consistent look on dark background
 const ToolIcon = ({ name, size = 14 }: { name: string; size?: number }) => {
     const common: any = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round" };
     switch (name) {
@@ -97,12 +102,14 @@ export default function Toolbar({ activeTool, setActiveTool, minZoom, zoom, setV
                     panel={
                         <div
                             style={{
-                                height: 140,
+                                height: 200,
                                 width: 44,
                                 padding: "10px 0",
                                 display: "flex",
+                                flexDirection: "column",
                                 alignItems: "center",
                                 justifyContent: "center",
+                                gap: 6,
                                 background: "linear-gradient(180deg, rgba(20,22,25,0.95), rgba(14,15,17,0.9))",
                                 borderRadius: 10,
                                 backdropFilter: "blur(10px)",
@@ -110,6 +117,13 @@ export default function Toolbar({ activeTool, setActiveTool, minZoom, zoom, setV
                                 boxShadow: "0 10px 30px rgba(0,0,0,0.6)",
                             }}
                         >
+                            <Button
+                                type="text"
+                                size="small"
+                                onClick={() => setViewState(prev => ({ ...prev, zoom: Math.min(1, prev.zoom + 0.1) }))}
+                                style={{ color: "#E9EEF5", background: "transparent", border: "none", padding: 0, width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, lineHeight: 1 }}
+                                icon={<CiZoomIn size={24} />}
+                            />
                             <Slider
                                 vertical
                                 min={minZoom}
@@ -121,6 +135,13 @@ export default function Toolbar({ activeTool, setActiveTool, minZoom, zoom, setV
                                 handleStyle={{ borderColor: "#1366FF", background: "#1366FF" }}
                                 trackStyle={{ backgroundColor: "#1366FF" }}
                                 railStyle={{ backgroundColor: "rgba(255,255,255,0.06)" }}
+                            />
+                            <Button
+                                type="text"
+                                size="small"
+                                onClick={() => setViewState(prev => ({ ...prev, zoom: Math.max(minZoom, prev.zoom - 0.1) }))}
+                                style={{ color: "#E9EEF5", background: "transparent", border: "none", padding: 0, width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, lineHeight: 1 }}
+                                icon={<CiZoomOut size={24} />}
                             />
                         </div>
                     }
@@ -213,6 +234,38 @@ export default function Toolbar({ activeTool, setActiveTool, minZoom, zoom, setV
                 >
                     Polygone
                 </Button>
+
+                <Button
+                    type="text"
+                    size="small"
+                    icon={<CiSettings size={16} />}
+                    style={{ color: "white", background: "transparent", border: "none", borderRadius: 8, display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-start", padding: "6px 10px" }}
+                >
+                    Réglages
+                </Button>
+
+                <div style={{ display: "flex", justifyContent: "center", gap: 8, width: "100%" }}>
+                    <Tooltip
+                        title="Undo"
+                    >
+                        <Button
+                            type="text"
+                            size="small"
+                            icon={<FaUndo size={12} />}
+                            style={{color: "white"}}
+                        />
+                    </Tooltip>
+                    <Tooltip
+                        title="Redo"
+                    >
+                        <Button
+                            type="text"
+                            size="small"
+                            icon={<FaRedo size={12} />}
+                            style={{color: "white"}}
+                        />
+                    </Tooltip>
+                </div>
             </div>
         </div>
     );
