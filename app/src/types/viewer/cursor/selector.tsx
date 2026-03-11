@@ -1,5 +1,6 @@
 import { Rectangle, Shape } from "../shapes";
 import { CanvaCursor } from "./canva";
+import type { CursorType } from "./canva";
 
 type ShapeBBox = { minX: number; maxX: number; minY: number; maxY: number } | null;
 
@@ -8,9 +9,18 @@ export class ShapeSelectorCursor extends CanvaCursor {
     private selectedShapes: Shape[] = [];
     private readonly getShapeBBox: (shape: Shape) => ShapeBBox;
 
-    constructor(strokeColor: string, strokeWidth: number, getShapeBBox: (shape: Shape) => ShapeBBox) {
-        super("selector", strokeColor, strokeWidth);
+    constructor(
+        strokeColor: string,
+        strokeWidth: number,
+        getShapeBBox: (shape: Shape) => ShapeBBox,
+        cursorType: CursorType = "selector",
+    ) {
+        super(cursorType, strokeColor, strokeWidth);
         this.getShapeBBox = getShapeBBox;
+    }
+
+    getSelectionRect(): { x: number; y: number; width: number; height: number } | null {
+        return this.getNormalizedRect();
     }
 
     setSelectableShapes(shapes: Shape[]): void {
@@ -56,5 +66,11 @@ export class ShapeSelectorCursor extends CanvaCursor {
 
         this.reset();
         return null;
+    }
+}
+
+export class CaptureSelectorCursor extends ShapeSelectorCursor {
+    constructor(strokeColor: string, strokeWidth: number, getShapeBBox: (shape: Shape) => ShapeBBox) {
+        super(strokeColor, strokeWidth, getShapeBBox, "capture");
     }
 }

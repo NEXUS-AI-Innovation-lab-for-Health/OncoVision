@@ -10,5 +10,5 @@ export {
     RectangleCursor,
     PolygonCursor,
 } from "./cursor/drawing";
-export { ShapeSelectorCursor } from "./cursor/selector";
+export { ShapeSelectorCursor, CaptureSelectorCursor } from "./cursor/selector";
 export { ShapeSelectorCursor as SelectorCursor } from "./cursor/selector";

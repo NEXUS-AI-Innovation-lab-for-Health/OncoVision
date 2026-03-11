@@ -12,6 +12,7 @@ import {
     PolygonCursor,
     RectangleCursor,
     ShapeSelectorCursor,
+    CaptureSelectorCursor,
 } from "../../types/viewer/cursors";
 import type { CursorBoundingBox, CursorType } from "../../types/viewer/cursors";
 import { Circle, Ellipse, Line, Polygon, Polyline, Rectangle, Shape } from "../../types/viewer/shapes";
@@ -78,6 +79,8 @@ export type CanvaProps = {
     onAction?: (action: DrawingAction) => void;
     /** Appelé quand l'état de l'historique change (utile pour activer/désactiver les boutons). */
     onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
+    /** Appelé quand l'outil capture termine une sélection. */
+    onCapture?: (data: { rect: { x: number; y: number; width: number; height: number }; shapes: Shape[] }) => void;
     // Optional image bounds (in image pixel coordinates). If provided, drawing is limited to these bounds.
     imageWidth?: number;
     imageHeight?: number;
@@ -149,6 +152,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     onViewStateChange,
     onAction,
     onHistoryChange,
+    onCapture,
     imageWidth,
     imageHeight,
     children,
@@ -171,6 +175,8 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     useEffect(() => { onActionRef.current = onAction; }, [onAction]);
     const onHistoryChangeRef = useRef(onHistoryChange);
     useEffect(() => { onHistoryChangeRef.current = onHistoryChange; }, [onHistoryChange]);
+    const onCaptureRef = useRef(onCapture);
+    useEffect(() => { onCaptureRef.current = onCapture; }, [onCapture]);
     const notifyHistory = () => onHistoryChangeRef.current?.(history.canUndo, history.canRedo);
     const moveCleanupRef = useRef<(() => void) | null>(null);
     const onViewStateChangeRef = useRef(onViewStateChange);
@@ -216,6 +222,8 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                     return new PolygonCursor(color, strokeWidth);
                 case "selector":
                     return new ShapeSelectorCursor("#4ea1ff", 1.5, getShapeBBox);
+                case "capture":
+                    return new CaptureSelectorCursor("#f59e0b", 1.5, getShapeBBox);
                 default:
                     return new LineCursor(color, strokeWidth);
             }
@@ -767,7 +775,20 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         if (cursorRef.current instanceof ShapeSelectorCursor) {
             cursorRef.current.setSelectableShapes(shapes);
         }
+        // Capture the selection rect BEFORE finish() resets start/end
+        const captureRect = (cursorRef.current instanceof CaptureSelectorCursor)
+            ? cursorRef.current.getSelectionRect()
+            : null;
         const shape = cursorRef.current.finish(force);
+        if (cursorRef.current instanceof CaptureSelectorCursor) {
+            const selectedShapes = cursorRef.current.getSelectedShapes();
+            if (captureRect && captureRect.width > 0 && captureRect.height > 0) {
+                onCaptureRef.current?.({ rect: captureRect, shapes: selectedShapes });
+            }
+            setPreviewShape(null);
+            setIsDrawing(false);
+            return;
+        }
         if (cursorRef.current instanceof ShapeSelectorCursor) {
             const selected = new Set(cursorRef.current.getSelectedShapes().map((s) => s.getId() as string));
             setSelectedShapeIds(selected);
@@ -794,7 +815,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
 
         (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
         cursorRef.current.press(point, bounds);
-        if (resolvedTool === "selector") {
+        if (resolvedTool === "selector" || resolvedTool === "capture") {
             setSelectedShapeIds(new Set());
         }
         setPreviewShape(cursorRef.current.createPreview());
@@ -1144,15 +1165,15 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                         {renderSelectionPanel()}
                         {previewShape && (
                             <g opacity={0.75}>
-                                {resolvedTool === "selector" && previewShape instanceof Rectangle ? (
+                                {(resolvedTool === "selector" || resolvedTool === "capture") && previewShape instanceof Rectangle ? (
                                     <>
                                         <rect
                                             x={previewShape.origin.x}
                                             y={previewShape.origin.y}
                                             width={previewShape.width}
                                             height={previewShape.height}
-                                            fill="rgba(78, 161, 255, 0.14)"
-                                            stroke="#4ea1ff"
+                                            fill={resolvedTool === "capture" ? "rgba(245, 158, 11, 0.14)" : "rgba(78, 161, 255, 0.14)"}
+                                            stroke={resolvedTool === "capture" ? "#f59e0b" : "#4ea1ff"}
                                             strokeWidth={1.5 / viewState.zoom}
                                             strokeDasharray={`${6 / viewState.zoom} ${4 / viewState.zoom}`}
                                         />

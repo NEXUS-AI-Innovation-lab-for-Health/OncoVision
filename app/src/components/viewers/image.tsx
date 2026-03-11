@@ -3,8 +3,11 @@ import { useRest } from "../../hooks/rest";
 import Toolbar from "./tool/bar";
 import ImagePreview from "./preview"; // New import
 import Canva from "./canva";
+import CaptureDialog from "./capture-dialog";
 import type { CanvaHandle, CanvaTool, CanvaProps, Properties } from "./canva";
 import { DEFAULT_PROPERTIES } from "./canva";
+import { Circle, Ellipse, Line, Polygon, Polyline, Rectangle } from "../../types/viewer/shapes";
+import type { Shape } from "../../types/viewer/shapes";
 
 interface ImageViewerProps {
     imageId: string;
@@ -56,6 +59,65 @@ function cancelStaleTiles(neededKeys: Set<string>) {
     }
 }
 
+/** Dessine une Shape sur un CanvasRenderingContext2D (coordonnées image). */
+function drawShapeOnCanvas(ctx: CanvasRenderingContext2D, shape: Shape): void {
+    ctx.save();
+    if (shape instanceof Line) {
+        ctx.strokeStyle = shape.borderColor;
+        ctx.lineWidth = shape.borderWidth;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(shape.start.x, shape.start.y);
+        ctx.lineTo(shape.end.x, shape.end.y);
+        ctx.stroke();
+    } else if (shape instanceof Circle) {
+        ctx.strokeStyle = shape.borderColor;
+        ctx.lineWidth = shape.borderWidth;
+        ctx.beginPath();
+        ctx.arc(shape.center.x, shape.center.y, shape.radius, 0, Math.PI * 2);
+        ctx.stroke();
+    } else if (shape instanceof Ellipse) {
+        ctx.strokeStyle = shape.borderColor;
+        ctx.lineWidth = shape.borderWidth;
+        ctx.beginPath();
+        ctx.ellipse(shape.center.x, shape.center.y, shape.radiusX, shape.radiusY, 0, 0, Math.PI * 2);
+        ctx.stroke();
+    } else if (shape instanceof Rectangle) {
+        ctx.strokeStyle = shape.borderColor;
+        ctx.lineWidth = shape.borderWidth;
+        ctx.beginPath();
+        ctx.rect(shape.origin.x, shape.origin.y, shape.width, shape.height);
+        ctx.stroke();
+    } else if (shape instanceof Polyline) {
+        ctx.strokeStyle = shape.borderColor;
+        ctx.lineWidth = shape.borderWidth;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        if (shape.points.length >= 2) {
+            ctx.beginPath();
+            ctx.moveTo(shape.points[0].x, shape.points[0].y);
+            for (let i = 1; i < shape.points.length; i++) {
+                ctx.lineTo(shape.points[i].x, shape.points[i].y);
+            }
+            ctx.stroke();
+        }
+    } else if (shape instanceof Polygon) {
+        ctx.strokeStyle = shape.borderColor;
+        ctx.lineWidth = shape.borderWidth;
+        ctx.lineJoin = "round";
+        if (shape.points.length >= 2) {
+            ctx.beginPath();
+            ctx.moveTo(shape.points[0].x, shape.points[0].y);
+            for (let i = 1; i < shape.points.length; i++) {
+                ctx.lineTo(shape.points[i].x, shape.points[i].y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+        }
+    }
+    ctx.restore();
+}
+
 export default function ImageViewer(props: ImageViewerProps) {
 
     const { imageId, canva } = props;
@@ -81,6 +143,10 @@ export default function ImageViewer(props: ImageViewerProps) {
     const [activeTool, setActiveTool] = useState<CanvaTool>("pan");
     const [properties, setProperties] = useState<Properties>(DEFAULT_PROPERTIES);
     const initializedDimensionForImageRef = useRef<string | null>(null);
+
+    // Capture state
+    const [captureDialogOpen, setCaptureDialogOpen] = useState(false);
+    const [captureRenderFn, setCaptureRenderFn] = useState<((canvas: HTMLCanvasElement) => Promise<void>) | null>(null);
 
     const getFitZoom = useCallback(() => {
         if (!infoRef.current || !containerRef.current) return 0.001;
@@ -148,6 +214,122 @@ export default function ImageViewer(props: ImageViewerProps) {
         const minZoom = getFitZoom();
         setViewState(prev => (prev.zoom < minZoom ? { ...prev, zoom: minZoom } : prev));
     }, [info, canvasSize, getFitZoom]);
+
+    /**
+     * Construit une fonction de rendu pour la capture de la zone rect (coords image)
+     * avec les shapes par-dessus. Utilisé par CaptureDialog.
+     */
+    const buildCaptureRenderer = useCallback((
+        rect: { x: number; y: number; width: number; height: number },
+        shapes: Shape[],
+    ) => {
+        return async (outputCanvas: HTMLCanvasElement) => {
+            if (!infoRef.current) return;
+            const currentInfo = infoRef.current;
+            const ctx = outputCanvas.getContext("2d");
+            if (!ctx) return;
+
+            const MAX_SIZE = 2048;
+            const aspect = rect.width / rect.height;
+            let outW: number, outH: number;
+            if (rect.width >= rect.height) {
+                outW = Math.min(Math.ceil(rect.width), MAX_SIZE);
+                outH = Math.round(outW / aspect);
+            } else {
+                outH = Math.min(Math.ceil(rect.height), MAX_SIZE);
+                outW = Math.round(outH * aspect);
+            }
+            outputCanvas.width = outW;
+            outputCanvas.height = outH;
+
+            const scaleX = outW / rect.width;
+            const scaleY = outH / rect.height;
+
+            ctx.fillStyle = "#111";
+            ctx.fillRect(0, 0, outW, outH);
+
+            const maxLevel = currentInfo.levels - 1;
+            let targetLevel = Math.ceil(maxLevel + Math.log2(scaleX));
+            if (targetLevel > maxLevel) targetLevel = maxLevel;
+            if (targetLevel < 0) targetLevel = 0;
+
+            const levelScaleFactor = Math.pow(0.5, maxLevel - targetLevel);
+            const tileSize = currentInfo.tileSize;
+            const levelWidth = Math.ceil(currentInfo.width * levelScaleFactor);
+            const levelHeight = Math.ceil(currentInfo.height * levelScaleFactor);
+            const maxTilesX = Math.ceil(levelWidth / tileSize);
+            const maxTilesY = Math.ceil(levelHeight / tileSize);
+
+            const minTileX = Math.max(0, Math.floor((rect.x * levelScaleFactor) / tileSize));
+            const maxTileX = Math.min(maxTilesX - 1, Math.floor(((rect.x + rect.width) * levelScaleFactor) / tileSize));
+            const minTileY = Math.max(0, Math.floor((rect.y * levelScaleFactor) / tileSize));
+            const maxTileY = Math.min(maxTilesY - 1, Math.floor(((rect.y + rect.height) * levelScaleFactor) / tileSize));
+
+            const drawTile = (img: HTMLImageElement, tx: number, ty: number) => {
+                const tileImgX = tx * tileSize;
+                const tileImgY = ty * tileSize;
+                const tileW = (tx === maxTilesX - 1) ? (levelWidth - tx * tileSize) : tileSize;
+                const tileH = (ty === maxTilesY - 1) ? (levelHeight - ty * tileSize) : tileSize;
+                const fullImgX = tileImgX / levelScaleFactor;
+                const fullImgY = tileImgY / levelScaleFactor;
+                const fullImgW = tileW / levelScaleFactor;
+                const fullImgH = tileH / levelScaleFactor;
+                const dstX = (fullImgX - rect.x) * scaleX;
+                const dstY = (fullImgY - rect.y) * scaleY;
+                const dstW = fullImgW * scaleX;
+                const dstH = fullImgH * scaleY;
+                ctx.drawImage(img, 0, 0, tileW, tileH, dstX, dstY, dstW, dstH);
+            };
+
+            const tilePromises: Promise<void>[] = [];
+            for (let tx = minTileX; tx <= maxTileX; tx++) {
+                for (let ty = minTileY; ty <= maxTileY; ty++) {
+                    const cacheKey = `${imageId}-${targetLevel}-${tx}-${ty}`;
+                    const cached = tileCache.get(cacheKey);
+                    if (cached) {
+                        drawTile(cached, tx, ty);
+                    } else {
+                        const _tx = tx, _ty = ty;
+                        tilePromises.push(
+                            get({ endpoint: `viewer/images/${imageId}/tile/${targetLevel}/${_tx}_${_ty}.webp`, blob: true })
+                                .then((blob: unknown) => {
+                                    if (!(blob instanceof Blob)) return;
+                                    return new Promise<void>((resolve) => {
+                                        const url = URL.createObjectURL(blob);
+                                        const img = new Image();
+                                        img.onload = () => {
+                                            tileCache.set(cacheKey, img);
+                                            URL.revokeObjectURL(url);
+                                            drawTile(img, _tx, _ty);
+                                            resolve();
+                                        };
+                                        img.onerror = () => { URL.revokeObjectURL(url); resolve(); };
+                                        img.src = url;
+                                    });
+                                })
+                                .catch(() => {}),
+                        );
+                    }
+                }
+            }
+            await Promise.all(tilePromises);
+
+            // Dessiner les shapes par-dessus en coordonnées image
+            ctx.save();
+            ctx.translate(-rect.x * scaleX, -rect.y * scaleY);
+            ctx.scale(scaleX, scaleY);
+            for (const shape of shapes) {
+                drawShapeOnCanvas(ctx, shape);
+            }
+            ctx.restore();
+        };
+    }, [imageId, get]);
+
+    const handleCapture = useCallback((data: { rect: { x: number; y: number; width: number; height: number }; shapes: Shape[] }) => {
+        const renderFn = buildCaptureRenderer(data.rect, data.shapes);
+        setCaptureRenderFn(() => renderFn);
+        setCaptureDialogOpen(true);
+    }, [buildCaptureRenderer]);
 
     // Main stable drawing function
     const draw = useCallback(() => {
@@ -488,6 +670,7 @@ export default function ImageViewer(props: ImageViewerProps) {
         imageWidth: info.width,
         imageHeight: info.height,
         onHistoryChange: (u: boolean, r: boolean) => { setCanUndo(u); setCanRedo(r); },
+        onCapture: handleCapture,
     };
 
     return (
@@ -541,6 +724,12 @@ export default function ImageViewer(props: ImageViewerProps) {
                 ref={canvaRef}
                 {...defaultCanvaProps}
                 {...canvaProps}
+            />
+
+            <CaptureDialog
+                open={captureDialogOpen}
+                onClose={() => setCaptureDialogOpen(false)}
+                renderCapture={captureRenderFn}
             />
         </div>
     );

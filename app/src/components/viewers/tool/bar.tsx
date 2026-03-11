@@ -83,6 +83,13 @@ const ToolIcon = ({ name, size = 14 }: { name: string; size?: number }) => {
                     <BsCursor size={size} />
                 </div>
             );
+        case "capture":
+            return (
+                <svg {...common}>
+                    <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="4 2" />
+                    <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none" />
+                </svg>
+            );
         default:
             return null;
     }
@@ -257,6 +264,16 @@ export default function Toolbar(props: ToolbarProps) {
                     style={{ color: activeTool === "selector" ? "#1366FF" : "#E9EEF5", background: "transparent", border: "none", borderRadius: 8, display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-start", padding: "6px 10px" }}
                 >
                     Curseur
+                </Button>
+
+                <Button
+                    type="text"
+                    size="small"
+                    icon={<ToolIcon name="capture" />}
+                    onClick={() => setActiveTool("capture")}
+                    style={{ color: activeTool === "capture" ? "#f59e0b" : "#E9EEF5", background: "transparent", border: "none", borderRadius: 8, display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-start", padding: "6px 10px" }}
+                >
+                    Capture
                 </Button>
 
                 <ToolbarItem
