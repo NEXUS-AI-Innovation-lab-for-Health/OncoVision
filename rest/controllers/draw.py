@@ -100,28 +100,30 @@ class DrawController(Controller, WebSocketHandler):
         self.add_api_websocket_route(f"/join_draw", self.handle_socket)
 
     @staticmethod
-    def _apply_offset(shape: ShapeUnion, offset: Point) -> None:
-        if hasattr(shape, "start") and hasattr(shape, "end"):
-            shape.start.x += offset.x
-            shape.start.y += offset.y
-            shape.end.x += offset.x
-            shape.end.y += offset.y
+    def _copy_geometry(target: ShapeUnion, source: ShapeUnion) -> None:
+        if hasattr(target, "start") and hasattr(target, "end") and hasattr(source, "start") and hasattr(source, "end"):
+            target.start.x = source.start.x
+            target.start.y = source.start.y
+            target.end.x = source.end.x
+            target.end.y = source.end.y
             return
 
-        if hasattr(shape, "center"):
-            shape.center.x += offset.x
-            shape.center.y += offset.y
+        if hasattr(target, "center") and hasattr(source, "center"):
+            target.center.x = source.center.x
+            target.center.y = source.center.y
             return
 
-        if hasattr(shape, "origin"):
-            shape.origin.x += offset.x
-            shape.origin.y += offset.y
+        if hasattr(target, "origin") and hasattr(source, "origin"):
+            target.origin.x = source.origin.x
+            target.origin.y = source.origin.y
             return
 
-        if hasattr(shape, "points"):
-            for point in shape.points:
-                point.x += offset.x
-                point.y += offset.y
+        if hasattr(target, "points") and hasattr(source, "points"):
+            for index, point in enumerate(target.points):
+                if index >= len(source.points):
+                    break
+                point.x = source.points[index].x
+                point.y = source.points[index].y
 
     @staticmethod
     def _normalize_action(author: DrawAuthor | None, action: DrawingActionUnion) -> DrawingActionUnion:
@@ -140,10 +142,11 @@ class DrawController(Controller, WebSocketHandler):
             return
 
         if isinstance(action, ShapeMoveAction):
-            ids = {shape.id for shape in action.shapes}
+            moved = {shape.id: shape for shape in action.shapes}
             for shape in session.shapes:
-                if shape.id in ids:
-                    self._apply_offset(shape, action.offset)
+                target = moved.get(shape.id)
+                if target is not None:
+                    self._copy_geometry(shape, target)
 
     @websocket_subscribe("handshake", HandshakeMessage)
     async def handle_handshake(self, websocket: WebSocket, message: HandshakeMessage) -> None:

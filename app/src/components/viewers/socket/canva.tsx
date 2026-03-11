@@ -65,6 +65,8 @@ export default function CanvaSocket(props: CanvaSocketProps) {
     useEffect(() => {    
 
         const bus = webSocketBus.current;
+        // Prevent duplicate handler registration (e.g. React StrictMode double effects in dev).
+        bus.clean();
         bus.register(new BusHandler());
 
         setOnConnect(() => {
@@ -74,7 +76,11 @@ export default function CanvaSocket(props: CanvaSocketProps) {
             });
         });
 
-        return bus.attach();
+        const detach = bus.attach();
+        return () => {
+            detach();
+            bus.clean();
+        };
     }, []);
 
     return (

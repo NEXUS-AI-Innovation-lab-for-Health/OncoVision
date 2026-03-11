@@ -268,11 +268,12 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         }
 
         if (action instanceof ShapeMoveAction) {
-            const ids = new Set(action.shapes.map((shape) => shape.getId() as string));
+            const targetMap = new Map(action.shapes.map((shape) => [shape.getId() as string, shape]));
             setShapes((prev) => {
                 for (const shape of prev) {
-                    if (ids.has(shape.getId() as string)) {
-                        applyMoveOffset(shape, action.offset.x, action.offset.y);
+                    const target = targetMap.get(shape.getId() as string);
+                    if (target) {
+                        restoreShapePositions(shape, target);
                     }
                 }
                 return [...prev];
@@ -443,9 +444,11 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
             // Émettre l'action seulement si la shape a réellement bougé
             const offset = computeShapeOffset(shape, original);
             if (offset.dx !== 0 || offset.dy !== 0) {
-                const action = new ShapeMoveAction([original], { x: offset.dx, y: offset.dy });
-                history.push(action);
-                onActionRef.current?.(action);
+                const historyAction = new ShapeMoveAction([original], { x: offset.dx, y: offset.dy });
+                history.push(historyAction);
+                // Broadcast absolute geometry to make remote move application idempotent.
+                const propagatedAction = new ShapeMoveAction([cloneShape(shape)], { x: offset.dx, y: offset.dy });
+                onActionRef.current?.(propagatedAction);
                 notifyHistory();
             }
             moveStartRef.current = null;
@@ -662,9 +665,14 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                 if (firstLive) {
                     const offset = computeShapeOffset(firstLive, firstOrig);
                     if (offset.dx !== 0 || offset.dy !== 0) {
-                        const action = new ShapeMoveAction(movedOriginals, { x: offset.dx, y: offset.dy });
-                        history.push(action);
-                        onActionRef.current?.(action);
+                        const historyAction = new ShapeMoveAction(movedOriginals, { x: offset.dx, y: offset.dy });
+                        history.push(historyAction);
+                        // Broadcast absolute geometry to make remote move application idempotent.
+                        const propagatedAction = new ShapeMoveAction(
+                            selectedShapes.map((shape) => cloneShape(shape)),
+                            { x: offset.dx, y: offset.dy },
+                        );
+                        onActionRef.current?.(propagatedAction);
                         notifyHistory();
                     }
                 }
