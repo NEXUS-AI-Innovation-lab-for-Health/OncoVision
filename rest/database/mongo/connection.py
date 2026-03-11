@@ -13,6 +13,7 @@ class MongoConnection:
             username=credentials.user,
             password=credentials.password,
             authSource="admin",
+            uuidRepresentation="standard",
         )
         self.database = credentials.database
     

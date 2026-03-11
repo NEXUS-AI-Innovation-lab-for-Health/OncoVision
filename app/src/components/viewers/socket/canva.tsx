@@ -4,6 +4,7 @@ import Canva from "../canva";
 import { useRest } from "../../../hooks/rest";
 import { subscribe, WebSocketBus, type WebSocketMessage } from "../../../utils/websocket";
 import { Shape } from "../../../types/viewer/shapes";
+import { drawingActionFromRaw, drawingActionToRaw } from "../../../types/viewer/action";
 
 interface HandshakedMessage extends WebSocketMessage {
     sessionId: string;
@@ -11,9 +12,9 @@ interface HandshakedMessage extends WebSocketMessage {
     shapes: Shape[];
 }
 
-interface PropagateShapesMessage extends WebSocketMessage {
+interface PropagateShapeActionMessage extends WebSocketMessage {
     sessionId: string;
-    shapes: Shape[];
+    action: object;
 }
 
 export type CanvaSocketProps = CanvaProps & {
@@ -51,14 +52,12 @@ export default function CanvaSocket(props: CanvaSocketProps) {
             setShapes(shapes);
         }
 
-        @subscribe("propagate_shapes")
-        propagateShapes(_socket: ReturnType<typeof useWebSocket>, rawMessage: object): void {
-            const message = rawMessage as PropagateShapesMessage;
+        @subscribe("propagate_shape_action")
+        propagateShapeAction(_socket: ReturnType<typeof useWebSocket>, rawMessage: object): void {
+            const message = rawMessage as PropagateShapeActionMessage;
+            const action = drawingActionFromRaw(message.action);
 
-            const shapes: Shape[] = Shape.fromRawArray(message.shapes);
-            console.log("Propagated shapes:", shapes);
-
-            setShapes(shapes);
+            handleRef.current?.applyAction(action);
         }
 
     }
@@ -67,16 +66,6 @@ export default function CanvaSocket(props: CanvaSocketProps) {
 
         const bus = webSocketBus.current;
         bus.register(new BusHandler());
-
-        if(handleRef.current) {
-            handleRef.current.setListener((shape: Shape, _shapes: Shape[]) => {
-                webSocketBus.current.publish({
-                    type: "add_shape",
-                    sessionId: sessionId.current,
-                    shape,
-                });
-            });
-        }
 
         setOnConnect(() => {
             bus.publish({
@@ -93,6 +82,17 @@ export default function CanvaSocket(props: CanvaSocketProps) {
             <Canva
                 {...props}
                 ref={handleRef}
+                onAction={(action) => {
+                    if (!sessionId.current) {
+                        return;
+                    }
+
+                    webSocketBus.current.publish({
+                        type: "shape_action",
+                        sessionId: sessionId.current,
+                        action: drawingActionToRaw(action),
+                    });
+                }}
             >
             </Canva>
         </div>

@@ -1,4 +1,7 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { useHistory } from "../../hooks/history";
+import { ShapeCreateAction, ShapesDeleteAction, ShapeMoveAction } from "../../types/viewer/action";
+import type { DrawingAction } from "../../types/viewer/action";
 import type { CSSProperties, ReactNode } from "react";
 import {
     CanvaCursor,
@@ -61,6 +64,10 @@ export type CanvaProps = {
     onShapeCreated?: (shape: Shape) => void;
     onDrawingActiveChange?: (active: boolean) => void;
     onViewStateChange?: (updater: (prev: CanvaViewState) => CanvaViewState) => void;
+    /** Appelé à chaque action utilisateur (création, suppression, déplacement). */
+    onAction?: (action: DrawingAction) => void;
+    /** Appelé quand l'état de l'historique change (utile pour activer/désactiver les boutons). */
+    onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
     // Optional image bounds (in image pixel coordinates). If provided, drawing is limited to these bounds.
     imageWidth?: number;
     imageHeight?: number;
@@ -70,8 +77,54 @@ export type CanvaProps = {
 export interface CanvaHandle {
     addShape: (shape: Shape) => void;
     removeShape: (shape: Shape) => void;
+    applyAction: (action: DrawingAction) => void;
     setListener: (listener: (shape: Shape, shapes: Shape[]) => void) => void;
     setShapes: (shapes: Shape[]) => void;
+    undo: () => void;
+    redo: () => void;
+}
+
+// Calcule le delta réel entre une shape déplacée et son clone original.
+function computeShapeOffset(current: Shape, original: Shape): { dx: number; dy: number } {
+    if (current instanceof Line && original instanceof Line)
+        return { dx: current.start.x - original.start.x, dy: current.start.y - original.start.y };
+    if ((current instanceof Circle || current instanceof Ellipse) && (original instanceof Circle || original instanceof Ellipse))
+        return { dx: (current as any).center.x - (original as any).center.x, dy: (current as any).center.y - (original as any).center.y };
+    if (current instanceof Rectangle && original instanceof Rectangle)
+        return { dx: current.origin.x - original.origin.x, dy: current.origin.y - original.origin.y };
+    if ((current instanceof Polygon || current instanceof Polyline) && (original instanceof Polygon || original instanceof Polyline)) {
+        const cp = (current as any).points as { x: number; y: number }[];
+        const op = (original as any).points as { x: number; y: number }[];
+        if (cp.length && op.length) return { dx: cp[0].x - op[0].x, dy: cp[0].y - op[0].y };
+    }
+    return { dx: 0, dy: 0 };
+}
+
+// Restaure les positions d'une shape à partir d'un clone original.
+function restoreShapePositions(live: Shape, original: Shape): void {
+    if (live instanceof Line && original instanceof Line) {
+        live.start = { ...original.start }; live.end = { ...original.end };
+    } else if ((live instanceof Circle || live instanceof Ellipse) && (original instanceof Circle || original instanceof Ellipse)) {
+        (live as any).center = { ...(original as any).center };
+    } else if (live instanceof Rectangle && original instanceof Rectangle) {
+        live.origin = { ...original.origin };
+    } else if ((live instanceof Polygon || live instanceof Polyline) && (original instanceof Polygon || original instanceof Polyline)) {
+        live.points = (original as any).points.map((p: { x: number; y: number }) => ({ ...p }));
+    }
+}
+
+// Applique un offset à une shape en place.
+function applyMoveOffset(shape: Shape, dx: number, dy: number): void {
+    if (shape instanceof Line) {
+        shape.start = { x: shape.start.x + dx, y: shape.start.y + dy };
+        shape.end   = { x: shape.end.x   + dx, y: shape.end.y   + dy };
+    } else if (shape instanceof Circle || shape instanceof Ellipse) {
+        (shape as any).center = { x: (shape as any).center.x + dx, y: (shape as any).center.y + dy };
+    } else if (shape instanceof Rectangle) {
+        shape.origin = { x: shape.origin.x + dx, y: shape.origin.y + dy };
+    } else if (shape instanceof Polygon || shape instanceof Polyline) {
+        shape.points = shape.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+    }
 }
 
 const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
@@ -82,7 +135,11 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     properties = DEFAULT_PROPERTIES,
     initialShapes = [],
     onShapeCreated,
-    onDrawingActiveChange,    onViewStateChange,    imageWidth,
+    onDrawingActiveChange,
+    onViewStateChange,
+    onAction,
+    onHistoryChange,
+    imageWidth,
     imageHeight,
     children,
 }: CanvaProps, ref) {
@@ -98,6 +155,13 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     const [movingShapeId, setMovingShapeId] = useState<string | null>(null);
         const [hoveredSelectionShapeId, setHoveredSelectionShapeId] = useState<string | null>(null);
     const moveStartRef = useRef<{ shapeId: string; pointerId: number; startPoint: Point; original: Shape; svg: SVGSVGElement } | null>(null);
+
+    const history = useHistory();
+    const onActionRef = useRef(onAction);
+    useEffect(() => { onActionRef.current = onAction; }, [onAction]);
+    const onHistoryChangeRef = useRef(onHistoryChange);
+    useEffect(() => { onHistoryChangeRef.current = onHistoryChange; }, [onHistoryChange]);
+    const notifyHistory = () => onHistoryChangeRef.current?.(history.canUndo, history.canRedo);
     const moveCleanupRef = useRef<(() => void) | null>(null);
     const onViewStateChangeRef = useRef(onViewStateChange);
     useEffect(() => { onViewStateChangeRef.current = onViewStateChange; }, [onViewStateChange]);
@@ -153,13 +217,19 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         onDrawingActiveChange?.(false);
     }, [resolvedTool, properties, imageWidth, imageHeight]);
 
-    const addShape = (shape: Shape) => {
+    const addShape = (shape: Shape, skipHistory?: boolean) => {
         setShapes((prev) => {
             const next = [...prev, shape];
             listenerRef.current?.(shape, next);
             return next;
         });
         onShapeCreated?.(shape);
+        if (!skipHistory) {
+            const action = new ShapeCreateAction(shape);
+            history.push(action);
+            onActionRef.current?.(action);
+            notifyHistory();
+        }
     };
 
     const removeShape = (shape: Shape) => {
@@ -175,29 +245,65 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         setIsDrawing(false);
     };
 
+    const applyAction = (action: DrawingAction) => {
+        if (action instanceof ShapeCreateAction) {
+            setShapes((prev) => [...prev, action.shape]);
+            setPreviewShape(null);
+            setIsDrawing(false);
+            return;
+        }
+
+        if (action instanceof ShapesDeleteAction) {
+            const ids = new Set(action.shapes.map((shape) => shape.getId() as string));
+            setShapes((prev) => prev.filter((shape) => !ids.has(shape.getId() as string)));
+            setSelectedShapeIds((prev) => {
+                if ([...prev].every((id) => !ids.has(id))) return prev;
+                const next = new Set(prev);
+                for (const id of ids) next.delete(id);
+                return next;
+            });
+            setPreviewShape(null);
+            setIsDrawing(false);
+            return;
+        }
+
+        if (action instanceof ShapeMoveAction) {
+            const ids = new Set(action.shapes.map((shape) => shape.getId() as string));
+            setShapes((prev) => {
+                for (const shape of prev) {
+                    if (ids.has(shape.getId() as string)) {
+                        applyMoveOffset(shape, action.offset.x, action.offset.y);
+                    }
+                }
+                return [...prev];
+            });
+        }
+    };
+
     const cloneShape = (shape: Shape): Shape => {
         if (shape instanceof Line) {
-            return new Line({ ...shape.start }, { ...shape.end }, shape.borderColor, shape.borderWidth);
+            return new Line({ ...shape.start }, { ...shape.end }, shape.borderColor, shape.borderWidth, shape.getId());
         }
         if (shape instanceof Circle) {
-            return new Circle({ ...shape.center }, shape.radius, shape.borderColor, shape.borderWidth);
+            return new Circle({ ...shape.center }, shape.radius, shape.borderColor, shape.borderWidth, shape.getId());
         }
         if (shape instanceof Ellipse) {
-            return new Ellipse({ ...shape.center }, shape.radiusX, shape.radiusY, shape.borderColor, shape.borderWidth);
+            return new Ellipse({ ...shape.center }, shape.radiusX, shape.radiusY, shape.borderColor, shape.borderWidth, shape.getId());
         }
         if (shape instanceof Rectangle) {
-            return new Rectangle({ ...shape.origin }, shape.width, shape.height, shape.borderColor, shape.borderWidth);
+            return new Rectangle({ ...shape.origin }, shape.width, shape.height, shape.borderColor, shape.borderWidth, shape.getId());
         }
         if (shape instanceof Polygon) {
-            return new Polygon(shape.points.map((p) => ({ ...p })), shape.borderColor, shape.borderWidth);
+            return new Polygon(shape.points.map((p) => ({ ...p })), shape.borderColor, shape.borderWidth, shape.getId());
         }
         if (shape instanceof Polyline) {
-            return new Polyline(shape.points.map((p) => ({ ...p })), shape.borderColor, shape.borderWidth);
+            return new Polyline(shape.points.map((p) => ({ ...p })), shape.borderColor, shape.borderWidth, shape.getId());
         }
         return shape;
     };
 
     const removeShapeById = (shapeId: string) => {
+        const deleted = shapes.find((s) => (s.getId() as string) === shapeId);
         setShapes((prev) => prev.filter((shape) => (shape.getId() as string) !== shapeId));
         setSelectedShapeIds((prev) => {
             if (!prev.has(shapeId)) return prev;
@@ -205,6 +311,12 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
             next.delete(shapeId);
             return next;
         });
+        if (deleted) {
+            const action = new ShapesDeleteAction([deleted]);
+            history.push(action);
+            onActionRef.current?.(action);
+            notifyHistory();
+        }
     };
 
     const startShapeMove = (shape: Shape, e: React.PointerEvent<SVGGElement>) => {
@@ -328,6 +440,14 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
             document.removeEventListener("pointermove", onMove);
             document.removeEventListener("pointerup", onEnd);
             document.removeEventListener("pointercancel", onEnd);
+            // Émettre l'action seulement si la shape a réellement bougé
+            const offset = computeShapeOffset(shape, original);
+            if (offset.dx !== 0 || offset.dy !== 0) {
+                const action = new ShapeMoveAction([original], { x: offset.dx, y: offset.dy });
+                history.push(action);
+                onActionRef.current?.(action);
+                notifyHistory();
+            }
             moveStartRef.current = null;
             setMovingShapeId(null);
             moveCleanupRef.current = null;
@@ -344,12 +464,70 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         moveCleanupRef.current = null;
     };
 
+    const undo = () => {
+        const action = history.undo();
+        if (!action) return;
+        if (action instanceof ShapeCreateAction) {
+            const id = action.shape.getId() as string;
+            setShapes(prev => prev.filter(s => (s.getId() as string) !== id));
+            setSelectedShapeIds(prev => {
+                if (!prev.has(id)) return prev;
+                const next = new Set(prev); next.delete(id); return next;
+            });
+        } else if (action instanceof ShapesDeleteAction) {
+            setShapes(prev => [...prev, ...action.shapes]);
+        } else if (action instanceof ShapeMoveAction) {
+            const origMap = new Map(action.shapes.map(s => [s.getId() as string, s]));
+            setShapes(prev => {
+                for (const s of prev) {
+                    const orig = origMap.get(s.getId() as string);
+                    if (orig) restoreShapePositions(s, orig);
+                }
+                return [...prev];
+            });
+        }
+        notifyHistory();
+    };
+
+    const redo = () => {
+        const action = history.redo();
+        if (!action) return;
+        if (action instanceof ShapeCreateAction) {
+            setShapes(prev => [...prev, action.shape]);
+        } else if (action instanceof ShapesDeleteAction) {
+            const ids = new Set(action.shapes.map(s => s.getId() as string));
+            setShapes(prev => prev.filter(s => !ids.has(s.getId() as string)));
+            setSelectedShapeIds(prev => {
+                if ([...prev].every(id => !ids.has(id))) return prev;
+                const next = new Set(prev);
+                for (const id of ids) next.delete(id);
+                return next;
+            });
+        } else if (action instanceof ShapeMoveAction) {
+            const ids = new Set(action.shapes.map(s => s.getId() as string));
+            setShapes(prev => {
+                for (const s of prev) {
+                    if (ids.has(s.getId() as string)) applyMoveOffset(s, action.offset.x, action.offset.y);
+                }
+                return [...prev];
+            });
+        }
+        notifyHistory();
+    };
+
     const removeAllSelected = () => {
         const toRemove = new Set(selectedShapeIds);
+        const deleted = shapes.filter((s) => toRemove.has(s.getId() as string));
         moveCleanupRef.current?.();
         setShapes((prev) => prev.filter((s) => !toRemove.has(s.getId() as string)));
         setSelectedShapeIds(new Set());
         setMovingShapeId(null);
+        if (deleted.length > 0) {
+            const action = new ShapesDeleteAction(deleted);
+            history.push(action);
+            onActionRef.current?.(action);
+            notifyHistory();
+        }
     };
 
     const startGroupMove = (selectedShapes: Shape[], e: React.PointerEvent<SVGGElement>) => {
@@ -476,6 +654,21 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
             document.removeEventListener("pointermove", onMove);
             document.removeEventListener("pointerup", onEnd);
             document.removeEventListener("pointercancel", onEnd);
+            // Émettre l'action de déplacement groupé si les shapes ont bougé
+            const movedOriginals = Array.from(originals.values());
+            if (movedOriginals.length > 0) {
+                const firstOrig = movedOriginals[0];
+                const firstLive = selectedShapes.find(s => (s.getId() as string) === (firstOrig.getId() as string));
+                if (firstLive) {
+                    const offset = computeShapeOffset(firstLive, firstOrig);
+                    if (offset.dx !== 0 || offset.dy !== 0) {
+                        const action = new ShapeMoveAction(movedOriginals, { x: offset.dx, y: offset.dy });
+                        history.push(action);
+                        onActionRef.current?.(action);
+                        notifyHistory();
+                    }
+                }
+            }
             setMovingShapeId(null);
             moveCleanupRef.current = null;
         };
@@ -498,9 +691,17 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     };
 
     useImperativeHandle(ref, () => {
-        const handle = { addShape, removeShape, setListener, setShapes: setShapesExternal };
+        const handle = {
+            addShape: (shape: Shape) => addShape(shape, true),
+            removeShape,
+            applyAction,
+            setListener,
+            setShapes: setShapesExternal,
+            undo,
+            redo,
+        };
         return handle;
-    }, [addShape, removeShape, setListener, setShapesExternal]);
+    }, [addShape, removeShape, applyAction, setListener, setShapesExternal, undo, redo]);
 
     const toImagePoint = (e: React.PointerEvent<SVGSVGElement>): Point => {
         const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();

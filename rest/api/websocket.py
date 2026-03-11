@@ -90,6 +90,7 @@ class WebSocketHandler:
     async def send_message(self, websocket: WebSocket, message: WebSocketMessage) -> None:
         await websocket.send_json(message.model_dump(
             by_alias=True,
+            mode="json",            # convert UUID -> str, bytes -> base64, etc.
         ))
 
     def register_websocket_handlers(self) -> int:

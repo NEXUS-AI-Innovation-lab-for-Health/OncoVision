@@ -9,11 +9,12 @@ export interface Point {
 
 export abstract class Shape {
 
-    private readonly id: UUIDTypes = crypto.randomUUID();
+    private readonly id: UUIDTypes;
     private readonly type: string;
 
-    constructor(type: string) {
+    constructor(type: string, id?: UUIDTypes) {
         this.type = type;
+        this.id = id ?? crypto.randomUUID();
     }
 
     abstract render(): ReactNode;
@@ -78,8 +79,8 @@ export class Line extends Shape implements Bordered {
     borderColor: string;
     borderWidth: number;
 
-    constructor(start: Point, end: Point, borderColor: string, borderWidth: number) {
-        super("line");
+    constructor(start: Point, end: Point, borderColor: string, borderWidth: number, id?: UUIDTypes) {
+        super("line", id);
         this.start = start;
         this.end = end;
         this.borderColor = borderColor;
@@ -88,7 +89,7 @@ export class Line extends Shape implements Bordered {
 
     static fromJson(json: string): Line {
         const data = JSON.parse(json);
-        return new Line(data.start, data.end, data.borderColor || "black", data.borderWidth || 1);
+        return new Line(data.start, data.end, data.borderColor || "black", data.borderWidth || 1, data.id);
     }
 
     render(): ReactNode {
@@ -123,8 +124,8 @@ export class Circle extends Shape implements Bordered {
     borderColor: string;
     borderWidth: number;
 
-    constructor(center: Point, radius: number, borderColor: string, borderWidth: number) {
-        super("circle");
+    constructor(center: Point, radius: number, borderColor: string, borderWidth: number, id?: UUIDTypes) {
+        super("circle", id);
         this.center = center;
         this.radius = radius;
         this.borderColor = borderColor;
@@ -133,7 +134,7 @@ export class Circle extends Shape implements Bordered {
 
     static fromJson(json: string): Circle {
         const data = JSON.parse(json);
-        return new Circle(data.center, data.radius, data.borderColor || "black", data.borderWidth || 1);
+        return new Circle(data.center, data.radius, data.borderColor || "black", data.borderWidth || 1, data.id);
     }
 
     render(): ReactNode {
@@ -173,8 +174,8 @@ export class Ellipse extends Shape implements Bordered {
     borderColor: string;
     borderWidth: number;
 
-    constructor(center: Point, radiusX: number, radiusY: number, borderColor: string, borderWidth: number) {
-        super("ellipse");
+    constructor(center: Point, radiusX: number, radiusY: number, borderColor: string, borderWidth: number, id?: UUIDTypes) {
+        super("ellipse", id);
         this.center = center;
         this.radiusX = radiusX;
         this.radiusY = radiusY;
@@ -184,7 +185,7 @@ export class Ellipse extends Shape implements Bordered {
 
     static fromJson(json: string): Ellipse {
         const data = JSON.parse(json);
-        return new Ellipse(data.center, data.radiusX, data.radiusY, data.borderColor || "black", data.borderWidth || 1);
+        return new Ellipse(data.center, data.radiusX, data.radiusY, data.borderColor || "black", data.borderWidth || 1, data.id);
     }
 
     render(): ReactNode {
@@ -229,8 +230,8 @@ export class Rectangle extends Shape implements Bordered {
     borderColor: string;
     borderWidth: number;
 
-    constructor(origin: Point, width: number, height: number, borderColor: string, borderWidth: number) {
-        super("rectangle");
+    constructor(origin: Point, width: number, height: number, borderColor: string, borderWidth: number, id?: UUIDTypes) {
+        super("rectangle", id);
         this.origin = origin;
         this.width = width;
         this.height = height;
@@ -240,7 +241,7 @@ export class Rectangle extends Shape implements Bordered {
 
     static fromJson(json: string): Rectangle {
         const data = JSON.parse(json);
-        return new Rectangle(data.origin, data.width, data.height, data.borderColor || "black", data.borderWidth || 1);
+        return new Rectangle(data.origin, data.width, data.height, data.borderColor || "black", data.borderWidth || 1, data.id);
     }
 
     render(): ReactNode {
@@ -282,8 +283,8 @@ export class Polygon extends Shape implements Bordered {
     borderColor: string;
     borderWidth: number;
 
-    constructor(points: Point[], borderColor: string, borderWidth: number) {
-        super("polygon");
+    constructor(points: Point[], borderColor: string, borderWidth: number, id?: UUIDTypes) {
+        super("polygon", id);
         this.points = points;
         this.borderColor = borderColor;
         this.borderWidth = borderWidth;
@@ -291,7 +292,7 @@ export class Polygon extends Shape implements Bordered {
 
     static fromJson(json: string): Polygon {
         const data = JSON.parse(json);
-        return new Polygon(data.points || [], data.borderColor || "black", data.borderWidth || 1);
+        return new Polygon(data.points || [], data.borderColor || "black", data.borderWidth || 1, data.id);
     }
 
     render(): ReactNode {
@@ -333,8 +334,8 @@ export class Polyline extends Shape implements Bordered {
     borderColor: string;
     borderWidth: number;
 
-    constructor(points: Point[], borderColor: string, borderWidth: number) {
-        super("polyline");
+    constructor(points: Point[], borderColor: string, borderWidth: number, id?: UUIDTypes) {
+        super("polyline", id);
         this.points = points;
         this.borderColor = borderColor;
         this.borderWidth = borderWidth;
@@ -342,7 +343,7 @@ export class Polyline extends Shape implements Bordered {
 
     static fromJson(json: string): Polyline {
         const data = JSON.parse(json);
-        return new Polyline(data.points || [], data.borderColor || "black", data.borderWidth || 1);
+        return new Polyline(data.points || [], data.borderColor || "black", data.borderWidth || 1, data.id);
     }
 
     render(): ReactNode {

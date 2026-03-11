@@ -75,6 +75,8 @@ export default function ImageViewer(props: ImageViewerProps) {
     const [isDragging, setIsDragging] = useState(false);
     const lastMousePos = useRef<{ x: number, y: number } | null>(null);
     const [isDrawingActive, setIsDrawingActive] = useState(false);
+    const [canUndo, setCanUndo] = useState(false);
+    const [canRedo, setCanRedo] = useState(false);
     const [canvasSize, setCanvasSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
     const [activeTool, setActiveTool] = useState<CanvaTool>("pan");
     const [properties, setProperties] = useState<Properties>(DEFAULT_PROPERTIES);
@@ -466,6 +468,7 @@ export default function ImageViewer(props: ImageViewerProps) {
         onViewStateChange: setViewState,
         imageWidth: info.width,
         imageHeight: info.height,
+        onHistoryChange: (u: boolean, r: boolean) => { setCanUndo(u); setCanRedo(r); },
     };
 
     return (
@@ -490,6 +493,10 @@ export default function ImageViewer(props: ImageViewerProps) {
                 setProperties={setProperties}
                 setViewState={setViewState}
                 minZoom={minZoom}
+                onUndo={() => canvaRef.current?.undo()}
+                onRedo={() => canvaRef.current?.redo()}
+                canUndo={canUndo}
+                canRedo={canRedo}
             />
 
             {/* Thumbnail preview */}

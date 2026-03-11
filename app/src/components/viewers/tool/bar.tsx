@@ -19,6 +19,17 @@ interface ToolbarProps {
     setViewState: Dispatch<SetStateAction<CanvaViewState>>;
     minZoom: number;
 }
+interface ToolbarProps {
+    canva: CanvaProps;
+    setActiveTool: Dispatch<SetStateAction<CanvaTool>>;
+    setProperties: Dispatch<SetStateAction<Properties>>;
+    setViewState: Dispatch<SetStateAction<CanvaViewState>>;
+    minZoom: number;
+    onUndo?: () => void;
+    onRedo?: () => void;
+    canUndo?: boolean;
+    canRedo?: boolean;
+}
 
 const ToolIcon = ({ name, size = 14 }: { name: string; size?: number }) => {
     const common: any = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round" };
@@ -79,7 +90,7 @@ const ToolIcon = ({ name, size = 14 }: { name: string; size?: number }) => {
 
 export default function Toolbar(props: ToolbarProps) {
 
-    const { canva, setActiveTool, setProperties: _setProperties, setViewState, minZoom } = props;
+    const { canva, setActiveTool, setProperties: _setProperties, setViewState, minZoom, onUndo, onRedo, canUndo = false, canRedo = false } = props;
     const { activeTool, viewState } = canva;
     const zoom = viewState.zoom;
 
@@ -270,7 +281,9 @@ export default function Toolbar(props: ToolbarProps) {
                             type="text"
                             size="small"
                             icon={<FaUndo size={12} />}
-                            style={{color: "white"}}
+                            onClick={onUndo}
+                            disabled={!canUndo}
+                            style={{ color: canUndo ? "white" : "rgba(255,255,255,0.3)" }}
                         />
                     </Tooltip>
                     <Tooltip
@@ -280,7 +293,9 @@ export default function Toolbar(props: ToolbarProps) {
                             type="text"
                             size="small"
                             icon={<FaRedo size={12} />}
-                            style={{color: "white"}}
+                            onClick={onRedo}
+                            disabled={!canRedo}
+                            style={{ color: canRedo ? "white" : "rgba(255,255,255,0.3)" }}
                         />
                     </Tooltip>
                 </div>

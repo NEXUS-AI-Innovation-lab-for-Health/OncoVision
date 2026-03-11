@@ -1,10 +1,14 @@
 from fastapi import WebSocket
 import random
+from typing import Annotated, Literal
+
+from pydantic import Field
 
 from api.controller import Controller
+from api.model import CamelModel
 from api.websocket import WebSocketHandler, WebSocketMessage, websocket_subscribe
 from database.mongo.connection import MongoConnection
-from models.form import Shape, ShapeUnion, Bordered
+from models.form import Bordered, Point, Shape, ShapeUnion
 
 class DrawAuthor:
     color: str
@@ -15,22 +19,28 @@ class DrawAuthor:
 class DrawSession:
     image_id: str
     authors: dict[WebSocket, DrawAuthor]
-    shapes: dict[DrawAuthor, list[Shape]]
+    shapes: list[ShapeUnion]
 
     def __init__(self, image_id: str): 
         self.image_id = image_id
         self.authors = {}
-        self.shapes = {}
+        self.shapes = []
 
     def as_document(self):
+        shapes = []
+        for shape in self.shapes:
+            doc = shape.model_dump()
+            if isinstance(doc.get("id"), (bytes,)):
+                # defensive, although pydantic should always give uuid.UUID
+                doc["id"] = str(doc["id"])
+            elif doc.get("id") is not None:
+                doc["id"] = str(doc["id"])
+            shapes.append(doc)
 
         return {
             "image_id": self.image_id,
             "authors": {str(id(ws)): author.color for ws, author in self.authors.items()},
-            "shapes": {
-                str(id(author)): [shape.model_dump() for shape in shapes]
-                for author, shapes in self.shapes.items()
-            },
+            "shapes": shapes,
         }
 
 class HandshakeMessage(WebSocketMessage, type="handshake"):
@@ -41,13 +51,41 @@ class HandshakedMessage(WebSocketMessage, type="handshaked"):
     color: str
     shapes: list[ShapeUnion]
 
-class AddShapeMessage(WebSocketMessage, type="add_shape"):
-    session_id: str | None = None
+
+class DrawingAction(CamelModel):
+    type: str
+
+
+class ShapeCreateAction(DrawingAction):
+    type: Literal["shape_create"] = "shape_create"
     shape: ShapeUnion
 
-class PropagateShapesMessage(WebSocketMessage, type="propagate_shapes"):
-    session_id: str
+
+class ShapesDeleteAction(DrawingAction):
+    type: Literal["shapes_delete"] = "shapes_delete"
     shapes: list[ShapeUnion]
+
+
+class ShapeMoveAction(DrawingAction):
+    type: Literal["shape_move"] = "shape_move"
+    shapes: list[ShapeUnion]
+    offset: Point
+
+
+DrawingActionUnion = Annotated[
+    ShapeCreateAction | ShapesDeleteAction | ShapeMoveAction,
+    Field(discriminator="type"),
+]
+
+
+class ShapeActionMessage(WebSocketMessage, type="shape_action"):
+    session_id: str | None = None
+    action: DrawingActionUnion
+
+
+class PropagateShapeActionMessage(WebSocketMessage, type="propagate_shape_action"):
+    session_id: str
+    action: DrawingActionUnion
 
 class DrawController(Controller, WebSocketHandler):
 
@@ -60,6 +98,52 @@ class DrawController(Controller, WebSocketHandler):
 
         self.sessions: dict[str, DrawSession] = {}
         self.add_api_websocket_route(f"/join_draw", self.handle_socket)
+
+    @staticmethod
+    def _apply_offset(shape: ShapeUnion, offset: Point) -> None:
+        if hasattr(shape, "start") and hasattr(shape, "end"):
+            shape.start.x += offset.x
+            shape.start.y += offset.y
+            shape.end.x += offset.x
+            shape.end.y += offset.y
+            return
+
+        if hasattr(shape, "center"):
+            shape.center.x += offset.x
+            shape.center.y += offset.y
+            return
+
+        if hasattr(shape, "origin"):
+            shape.origin.x += offset.x
+            shape.origin.y += offset.y
+            return
+
+        if hasattr(shape, "points"):
+            for point in shape.points:
+                point.x += offset.x
+                point.y += offset.y
+
+    @staticmethod
+    def _normalize_action(author: DrawAuthor | None, action: DrawingActionUnion) -> DrawingActionUnion:
+        if isinstance(action, ShapeCreateAction) and author and isinstance(action.shape, Bordered):
+            action.shape.border_color = author.color
+        return action
+
+    def _apply_action(self, session: DrawSession, action: DrawingActionUnion) -> None:
+        if isinstance(action, ShapeCreateAction):
+            session.shapes.append(action.shape)
+            return
+
+        if isinstance(action, ShapesDeleteAction):
+            ids = {shape.id for shape in action.shapes}
+            session.shapes = [shape for shape in session.shapes if shape.id not in ids]
+            return
+
+        if isinstance(action, ShapeMoveAction):
+            ids = {shape.id for shape in action.shapes}
+            for shape in session.shapes:
+                if shape.id in ids:
+                    self._apply_offset(shape, action.offset)
 
     @websocket_subscribe("handshake", HandshakeMessage)
     async def handle_handshake(self, websocket: WebSocket, message: HandshakeMessage) -> None:
@@ -74,18 +158,14 @@ class DrawController(Controller, WebSocketHandler):
         color = f"#{random.randint(0, 0xFFFFFF):06x}"
         session.authors[websocket] = DrawAuthor(color)
 
-        shapes = []
-        for author in session.authors.values():
-            shapes.extend(session.shapes.get(author, []))
-
         await self.send_message(websocket, HandshakedMessage(
             session_id=message.session_id,
             color=color,    
-            shapes=shapes,
+            shapes=session.shapes,
         ))
 
-    @websocket_subscribe("add_shape", AddShapeMessage)
-    async def handle_add_shape(self, websocket: WebSocket, message: AddShapeMessage) -> None:
+    @websocket_subscribe("shape_action", ShapeActionMessage)
+    async def handle_shape_action(self, websocket: WebSocket, message: ShapeActionMessage) -> None:
 
         message.session_id = "Test"
         session = self.sessions.get(message.session_id)
@@ -95,18 +175,9 @@ class DrawController(Controller, WebSocketHandler):
         author = session.authors.get(websocket)
         if not author:
             return
-        
-        if author not in session.shapes:
-            session.shapes[author] = []
 
-        if isinstance(message.shape, Bordered):
-            message.shape.border_color = author.color
-
-        session.shapes[author].append(message.shape)
-
-        shapes = []
-        for author in session.authors.values():
-            shapes.extend(session.shapes.get(author, []))
+        action = self._normalize_action(author, message.action)
+        self._apply_action(session, action)
 
         self.collection.update_one(
             {"image_id": session.image_id},
@@ -116,9 +187,9 @@ class DrawController(Controller, WebSocketHandler):
 
         for ws in session.authors.keys():
             if ws != websocket:
-                await self.send_message(ws, PropagateShapesMessage(
+                await self.send_message(ws, PropagateShapeActionMessage(
                     session_id=message.session_id,
-                    shapes=shapes,
+                    action=action,
                 ))
 
     async def on_socket_disconnect(self, websocket, error = None):
