@@ -115,10 +115,13 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
     const [showLabels, setShowLabels] = useState(true);
     const [scaleFactor, setScaleFactor] = useState<number>(1); // units per pixel
     const [scaleUnit, setScaleUnit] = useState<string>('px');
+    const [captureMode, setCaptureMode] = useState(false);
+    const [captureSelection, setCaptureSelection] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
     
     // Touch support refs
     const lastTouchDistance = useRef<number | null>(null);
     const lastTouchCenter = useRef<{ x: number, y: number } | null>(null);
+    const captureStartRef = useRef<{ x: number; y: number } | null>(null);
 
     useEffect(() => {
         const checkMobile = () => {
@@ -362,12 +365,33 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
 
     const handleMouseDown = (e: React.MouseEvent) => {
         if (isDrawingActive) return;
+        
+        // If in capture mode, start capture selection
+        if (captureMode) {
+            const rect = containerRef.current?.getBoundingClientRect();
+            if (rect) {
+                captureStartRef.current = { 
+                    x: e.clientX - rect.left, 
+                    y: e.clientY - rect.top 
+                };
+            }
+            return;
+        }
+        
         setIsDragging(true);
         lastMousePos.current = { x: e.clientX, y: e.clientY };
     };
 
     const handleMouseUp = () => {
         if (isDrawingActive) return;
+        
+        // If in capture mode and selection was made, capture it
+        if (captureMode && captureStartRef.current && captureSelection) {
+            // Perform the capture
+            performCapture();
+            return;
+        }
+        
         setIsDragging(false);
         lastMousePos.current = null;
         checkBounds();
@@ -416,6 +440,21 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
 
     const handleMouseMove = (e: React.MouseEvent) => {
         if (isDrawingActive) return;
+        
+        // If in capture mode and mouse button is down, update selection
+        if (captureMode && captureStartRef.current) {
+            const rect = containerRef.current?.getBoundingClientRect();
+            if (rect) {
+                setCaptureSelection({
+                    startX: captureStartRef.current.x,
+                    startY: captureStartRef.current.y,
+                    endX: e.clientX - rect.left,
+                    endY: e.clientY - rect.top
+                });
+            }
+            return;
+        }
+        
         if (!isDragging || !lastMousePos.current) return;
         const dx = e.clientX - lastMousePos.current.x;
         const dy = e.clientY - lastMousePos.current.y;
@@ -539,20 +578,86 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
 
     // Capture a screenshot of the current viewer canvas and trigger download
     const takeScreenshot = () => {
-        if (!canvasRef.current) return;
+        // Toggle capture mode
+        if (!captureMode) {
+            setCaptureMode(true);
+            setCaptureSelection(null);
+            return;
+        }
+        
+        // If already in capture mode and a selection exists, capture it
+        if (captureSelection && canvasRef.current) {
+            performCapture();
+            return;
+        }
+        
+        // If capture mode is on but no selection, just exit
+        setCaptureMode(false);
+        setCaptureSelection(null);
+    };
+
+    const performCapture = () => {
+        if (!captureSelection || !canvasRef.current) return;
+        
         try {
-            canvasRef.current.toBlob((blob) => {
-                if (!blob) return;
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `screenshot-${Date.now()}.png`;
-                link.click();
-                URL.revokeObjectURL(url);
-            });
+            const { startX, startY, endX, endY } = captureSelection;
+            
+            // Normalize coordinates
+            const minX = Math.min(startX, endX);
+            const minY = Math.min(startY, endY);
+            const maxX = Math.max(startX, endX);
+            const maxY = Math.max(startY, endY);
+            
+            const width = Math.ceil(Math.abs(maxX - minX));
+            const height = Math.ceil(Math.abs(maxY - minY));
+            
+            if (width > 0 && height > 0) {
+                // Create a temporary canvas for the cropped image
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = width;
+                tempCanvas.height = height;
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                if (tempCtx) {
+                    // Draw the cropped region from the main canvas
+                    tempCtx.drawImage(
+                        canvasRef.current,
+                        Math.floor(minX),
+                        Math.floor(minY),
+                        width,
+                        height,
+                        0,
+                        0,
+                        width,
+                        height
+                    );
+                    
+                    // Download the cropped image
+                    tempCanvas.toBlob((blob) => {
+                        if (!blob) return;
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = `screenshot-${Date.now()}.png`;
+                        link.click();
+                        URL.revokeObjectURL(url);
+                    });
+                    
+                    // Exit capture mode
+                    setCaptureMode(false);
+                    setCaptureSelection(null);
+                    captureStartRef.current = null;
+                    return;
+                }
+            }
         } catch (err) {
             console.error('Screenshot error:', err);
         }
+        
+        // Exit capture mode on error
+        setCaptureMode(false);
+        setCaptureSelection(null);
+        captureStartRef.current = null;
     };
 
     // Listen for fullscreen changes
@@ -772,14 +877,18 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                             style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
                         />
                     </Tooltip>
-                    <Tooltip title="Capture d'écran" placement="right">
+                    <Tooltip title={captureMode ? "Annuler la capture" : "Capture d'écran"} placement="right">
                         <Button
-                            type="text"
+                            type={captureMode ? "primary" : "text"}
                             shape="circle"
                             size="small"
                             icon={<FiCamera size={isMobile ? 12 : 13} />}
                             onClick={takeScreenshot}
-                            style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
+                            style={captureMode ? { 
+                                background: '#1366FF', 
+                                color: '#FFF', 
+                                border: '1px solid #1366FF' 
+                            } : { color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
                         />
                     </Tooltip>
                     <Tooltip title={isFullscreen ? "Quitter plein écran" : "Plein écran"} placement="right">
@@ -999,6 +1108,61 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                 ref={canvasRef} 
                 style={{ display: "block", width: "100%", height: "100%" }} 
             />
+            
+            {/* Capture mode overlay and selection rectangle */}
+            {captureMode && (
+                <>
+                    {/* Semi-transparent overlay - clickable to exit */}
+                    <div 
+                        onClick={() => {
+                            setCaptureMode(false);
+                            setCaptureSelection(null);
+                        }}
+                        style={{
+                            position: 'absolute',
+                            inset: 0,
+                            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                            cursor: 'crosshair',
+                            zIndex: 250
+                        }} 
+                    />
+                    
+                    {/* Selection rectangle */}
+                    {captureSelection && (
+                        <div style={{
+                            position: 'absolute',
+                            left: Math.min(captureSelection.startX, captureSelection.endX),
+                            top: Math.min(captureSelection.startY, captureSelection.endY),
+                            width: Math.abs(captureSelection.endX - captureSelection.startX),
+                            height: Math.abs(captureSelection.endY - captureSelection.startY),
+                            border: '2px solid #1366FF',
+                            backgroundColor: 'rgba(19, 102, 255, 0.1)',
+                            zIndex: 251,
+                            pointerEvents: 'none',
+                            boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.4)'
+                        }} />
+                    )}
+                    
+                    {/* Instruction text */}
+                    <div style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        background: 'rgba(20, 22, 25, 0.9)',
+                        color: '#E9EEF5',
+                        padding: '16px 24px',
+                        borderRadius: 8,
+                        fontSize: 14,
+                        zIndex: 252,
+                        textAlign: 'center',
+                        pointerEvents: 'none'
+                    }}>
+                        <div>Dessinez une région à capturer</div>
+                        <div style={{ fontSize: 12, color: '#BFC7D6', marginTop: 8 }}>Cliquez et glissez pour sélectionner</div>
+                    </div>
+                </>
+            )}
 
             <Canva
                 ref={canvaRef}

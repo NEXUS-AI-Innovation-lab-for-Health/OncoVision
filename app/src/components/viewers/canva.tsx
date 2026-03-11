@@ -12,7 +12,6 @@ import {
 import type { CursorType } from "../../types/viewer/cursors";
 import { Shape } from "../../types/viewer/shapes";
 import type { Point } from "../../types/viewer/shapes";
-
 export type CanvaTool = "pan" | CursorType;
 
 export interface CanvaViewState {
