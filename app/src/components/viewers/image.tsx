@@ -493,6 +493,7 @@ export default function ImageViewer(props: ImageViewerProps) {
     return (
         <div 
             ref={containerRef} 
+            data-canvas-root="true"
             style={{ 
                 width: "100%", 
                 height: "100%", 

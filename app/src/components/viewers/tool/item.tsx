@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 interface ToolbarItemProps {
     children: ReactNode;
@@ -7,7 +7,9 @@ interface ToolbarItemProps {
 
 export default function ToolbarItem({ children, panel }: ToolbarItemProps) {
     const rootRef = useRef<HTMLDivElement>(null);
+    const panelRef = useRef<HTMLDivElement>(null);
     const [isOpen, setIsOpen] = useState(false);
+    const [panelTop, setPanelTop] = useState(0);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -21,6 +23,45 @@ export default function ToolbarItem({ children, panel }: ToolbarItemProps) {
         document.addEventListener("pointerdown", handleDocumentPointerDown);
         return () => document.removeEventListener("pointerdown", handleDocumentPointerDown);
     }, [isOpen]);
+
+    useLayoutEffect(() => {
+        if (!isOpen) return;
+
+        const updatePanelPosition = () => {
+            const root = rootRef.current;
+            const panelEl = panelRef.current;
+            if (!root || !panelEl) return;
+
+            const rootRect = root.getBoundingClientRect();
+            const panelRect = panelEl.getBoundingClientRect();
+
+            const canvasHost = root.closest("[data-canvas-root='true']") as HTMLElement | null;
+            const toolbarHost = root.closest("[data-toolbar-root='true']") as HTMLElement | null;
+            const boundsRect = canvasHost?.getBoundingClientRect();
+            const toolbarRect = toolbarHost?.getBoundingClientRect();
+
+            if (!boundsRect) {
+                setPanelTop(0);
+                return;
+            }
+
+            // Default anchor aligns panel top with the toolbar item row.
+            const preferredTop = 0;
+            // Keep panel inside canvas vertical bounds.
+            const minTopByCanvas = boundsRect.top - rootRect.top;
+            const maxTopByCanvas = boundsRect.bottom - rootRect.top - panelRect.height;
+            // Don't allow panel to go above the toolbar top edge.
+            const minTopByToolbar = toolbarRect ? (toolbarRect.top - rootRect.top) : minTopByCanvas;
+            const minTop = Math.max(minTopByCanvas, minTopByToolbar);
+
+            const clampedTop = Math.min(Math.max(preferredTop, minTop), maxTopByCanvas);
+            setPanelTop(clampedTop);
+        };
+
+        updatePanelPosition();
+        window.addEventListener("resize", updatePanelPosition);
+        return () => window.removeEventListener("resize", updatePanelPosition);
+    }, [isOpen, panel]);
 
     return (
         <div
@@ -54,10 +95,11 @@ export default function ToolbarItem({ children, panel }: ToolbarItemProps) {
 
             {panel && isOpen ? (
                 <div
+                    ref={panelRef}
                     onPointerDown={event => event.stopPropagation()}
                     style={{
                         position: "absolute",
-                        top: 0,
+                        top: panelTop,
                         left: "calc(100% + 16px)",
                         zIndex: 320,
                         background: "linear-gradient(180deg, rgba(20,22,25,0.95), rgba(14,15,17,0.9))",

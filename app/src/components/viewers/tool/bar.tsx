@@ -96,6 +96,7 @@ export default function Toolbar(props: ToolbarProps) {
 
     return (
         <div
+            data-toolbar-root="true"
             style={{
                 position: "absolute",
                 left: 16,
