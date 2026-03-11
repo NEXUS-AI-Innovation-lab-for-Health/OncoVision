@@ -2,10 +2,9 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Slider, Button, Tooltip, Popover, InputNumber, Select, Space } from "antd";
 import { FiZoomIn, FiZoomOut, FiMaximize2, FiMinimize2, FiChevronLeft, FiChevronRight, FiCamera } from "react-icons/fi";
 import { useRest } from "../../hooks/rest";
-import ImagePreview from "./preview"; // New import
+import ImagePreview from "./preview";
 import Canva from "./canva";
 import type { CanvaHandle, CanvaTool } from "./canva";
-import html2canvas from "html2canvas";
 
 // Small inline icons to avoid extra dependencies and ensure consistent look on dark background
 const ToolIcon = ({ name, size = 14 }: { name: string; size?: number }) => {
@@ -94,6 +93,7 @@ const tileCache = new Map<string, HTMLImageElement>();
 const activeFetches = new Set<string>();
 
 export default function ImageViewer({ imageId }: ImageViewerProps) {
+
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const canvaRef = useRef<CanvaHandle>(null);
@@ -152,12 +152,10 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
             const containerW = containerRef.current.clientWidth;
             const containerH = containerRef.current.clientHeight;
             
+            // Initial zoom to see the entire image (contain) without excessive margin
             const scaleX = containerW / info.width;
             const scaleY = containerH / info.height;
-
-            // Initial zoom: much closer by default (zoom value of 0.5 or 0.8 depending on needs, 
-            // but let's go with a fixed high scale or a multiple of the fit-to-screen zoom)
-            const initialZoom = Math.max(0.5, Math.min(scaleX, scaleY) * 4);
+            const initialZoom = Math.min(scaleX, scaleY);
 
             const newState = {
                 x: info.width / 2,
@@ -458,7 +456,6 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
     const handleTouchMove = (e: React.TouchEvent) => {
         if (isDrawingActive) return;
         
-        // Prevent default only if possible (avoid passive event listener error)
         try {
             e.preventDefault();
         } catch (err) {
@@ -540,17 +537,16 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
         }
     };
 
-    // Capture a screenshot of the current viewer container and trigger download
-    const takeScreenshot = async () => {
-        if (!containerRef.current) return;
+    // Capture a screenshot of the current viewer canvas and trigger download
+    const takeScreenshot = () => {
+        if (!canvasRef.current) return;
         try {
-            const canvas = await html2canvas(containerRef.current, { useCORS: true });
-            canvas.toBlob((blob) => {
+            canvasRef.current.toBlob((blob) => {
                 if (!blob) return;
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = 'screenshot.png';
+                link.download = `screenshot-${Date.now()}.png`;
                 link.click();
                 URL.revokeObjectURL(url);
             });
@@ -568,7 +564,6 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
         document.addEventListener('fullscreenchange', handleFullscreenChange);
         return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
     }, []);
-
     // Redraw when state changes
     useEffect(() => {
         requestAnimationFrame(draw);
