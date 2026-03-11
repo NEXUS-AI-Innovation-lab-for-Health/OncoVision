@@ -986,6 +986,62 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         return null;
     };
 
+    const chooseBestOverlayPosition = (
+        anchor: Point,
+        boxW: number,
+        boxH: number,
+        visible: { minX: number; maxX: number; minY: number; maxY: number },
+    ) => {
+        const pad = 4 / viewState.zoom;
+        const offset = 8 / viewState.zoom;
+        const minX = visible.minX + pad;
+        const maxX = visible.maxX - boxW - pad;
+        const minY = visible.minY + pad;
+        const maxY = visible.maxY - boxH - pad;
+
+        const clamp = (value: number, lo: number, hi: number) => {
+            if (lo > hi) return lo;
+            return Math.max(lo, Math.min(hi, value));
+        };
+
+        const overflow = (x: number, y: number) => {
+            const left = Math.max(0, minX - x);
+            const right = Math.max(0, x - maxX);
+            const top = Math.max(0, minY - y);
+            const bottom = Math.max(0, y - maxY);
+            return left + right + top + bottom;
+        };
+
+        const candidates = [
+            { x: anchor.x + offset, y: anchor.y - boxH / 2 },
+            { x: anchor.x - boxW - offset, y: anchor.y - boxH / 2 },
+            { x: anchor.x - boxW / 2, y: anchor.y - boxH - offset },
+            { x: anchor.x - boxW / 2, y: anchor.y + offset },
+            { x: anchor.x + offset, y: anchor.y + offset },
+            { x: anchor.x - boxW - offset, y: anchor.y - boxH - offset },
+        ];
+
+        let best = {
+            x: clamp(candidates[0].x, minX, maxX),
+            y: clamp(candidates[0].y, minY, maxY),
+            score: Number.POSITIVE_INFINITY,
+            distance: Number.POSITIVE_INFINITY,
+        };
+
+        for (const candidate of candidates) {
+            const clampedX = clamp(candidate.x, minX, maxX);
+            const clampedY = clamp(candidate.y, minY, maxY);
+            const score = overflow(candidate.x, candidate.y);
+            const distance = Math.hypot(clampedX - candidate.x, clampedY - candidate.y);
+
+            if (score < best.score || (score === best.score && distance < best.distance)) {
+                best = { x: clampedX, y: clampedY, score, distance };
+            }
+        }
+
+        return { x: best.x, y: best.y };
+    };
+
     const renderShapeDetails = (shape: Shape, idx: number) => {
         const isSelected = selectedShapeIds.has(shape.getId() as string);
         const shapeId = shape.getId() as string;
@@ -1014,10 +1070,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         const boxW = SHAPE_DETAIL_BOX_WIDTH;
         const boxH = getShapeDetailBoxHeight(detailEntries.length);
 
-        const desiredX = anchor.x + 5;
-        const desiredY = anchor.y - boxH / 2;
-        const lx = Math.max(visible.minX + 4, Math.min(desiredX, visible.maxX - boxW - 4));
-        const ly = Math.max(visible.minY + 4, Math.min(desiredY, visible.maxY - boxH - 4));
+        const { x: lx, y: ly } = chooseBestOverlayPosition(anchor, boxW, boxH, visible);
 
         if (isDrawing) {
             const margin = 12 / viewState.zoom;
@@ -1090,10 +1143,8 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         const visible = getVisibleWorldBounds();
         const panelW = SELECTION_PANEL_WIDTH;
         const panelH = getSelectionPanelHeight(selectedShapes.length);
-        const desiredX = mxX + 5 / viewState.zoom;
-        const desiredY = mnY;
-        const lx = Math.max(visible.minX + 4 / viewState.zoom, Math.min(desiredX, visible.maxX - panelW - 4 / viewState.zoom));
-        const ly = Math.max(visible.minY + 4 / viewState.zoom, Math.min(desiredY, visible.maxY - panelH - 4 / viewState.zoom));
+        const anchor = { x: mxX, y: mnY };
+        const { x: lx, y: ly } = chooseBestOverlayPosition(anchor, panelW, panelH, visible);
 
         return (
             <SelectionPanel
@@ -1148,50 +1199,49 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                             </clipPath>
                         )}
                     </defs>
-                    <g
-                        transform={`translate(${width / 2}, ${height / 2}) scale(${viewState.zoom}) translate(${-viewState.x}, ${-viewState.y})`}
-                        clipPath={typeof imageWidth === "number" && typeof imageHeight === "number" ? `url(#${imageClipPathId})` : undefined}
-                    >
-                        {shapes.map((shape, idx) => {
-                            const elem = shape.render() as any;
-                            const shapeId = shape.getId() as string;
-                            if (hoveredInfo?.idx === idx || hoveredSelectionShapeId === shapeId) {
-                                // override stroke and strokeWidth for highlight
-                                const override: any = { stroke: "#409EFF" };
-                                const baseWidth = elem.props?.strokeWidth ?? ("borderWidth" in shape ? (shape as any).borderWidth : undefined);
-                                if (typeof baseWidth === "number") override.strokeWidth = baseWidth + 2;
-                                return <g key={`shape-${idx}`}>{React.cloneElement(elem, override)}</g>;
-                            }
-                            if (selectedShapeIds.has(shapeId)) {
-                                const override: any = { stroke: "#22c55e" };
-                                const baseWidth = elem.props?.strokeWidth ?? ("borderWidth" in shape ? (shape as any).borderWidth : undefined);
-                                if (typeof baseWidth === "number") override.strokeWidth = baseWidth + 1.5;
-                                return <g key={`shape-${idx}`}>{React.cloneElement(elem, override)}</g>;
-                            }
-                            return <g key={`shape-${idx}`}>{elem}</g>;
-                        })}
+                    <g transform={`translate(${width / 2}, ${height / 2}) scale(${viewState.zoom}) translate(${-viewState.x}, ${-viewState.y})`}>
+                        <g clipPath={typeof imageWidth === "number" && typeof imageHeight === "number" ? `url(#${imageClipPathId})` : undefined}>
+                            {shapes.map((shape, idx) => {
+                                const elem = shape.render() as any;
+                                const shapeId = shape.getId() as string;
+                                if (hoveredInfo?.idx === idx || hoveredSelectionShapeId === shapeId) {
+                                    // override stroke and strokeWidth for highlight
+                                    const override: any = { stroke: "#409EFF" };
+                                    const baseWidth = elem.props?.strokeWidth ?? ("borderWidth" in shape ? (shape as any).borderWidth : undefined);
+                                    if (typeof baseWidth === "number") override.strokeWidth = baseWidth + 2;
+                                    return <g key={`shape-${idx}`}>{React.cloneElement(elem, override)}</g>;
+                                }
+                                if (selectedShapeIds.has(shapeId)) {
+                                    const override: any = { stroke: "#22c55e" };
+                                    const baseWidth = elem.props?.strokeWidth ?? ("borderWidth" in shape ? (shape as any).borderWidth : undefined);
+                                    if (typeof baseWidth === "number") override.strokeWidth = baseWidth + 1.5;
+                                    return <g key={`shape-${idx}`}>{React.cloneElement(elem, override)}</g>;
+                                }
+                                return <g key={`shape-${idx}`}>{elem}</g>;
+                            })}
+                            {previewShape && (
+                                <g opacity={0.75}>
+                                    {(resolvedTool === "selector" || resolvedTool === "capture") && previewShape instanceof Rectangle ? (
+                                        <>
+                                            <rect
+                                                x={previewShape.origin.x}
+                                                y={previewShape.origin.y}
+                                                width={previewShape.width}
+                                                height={previewShape.height}
+                                                fill={resolvedTool === "capture" ? "rgba(245, 158, 11, 0.14)" : "rgba(78, 161, 255, 0.14)"}
+                                                stroke={resolvedTool === "capture" ? "#f59e0b" : "#4ea1ff"}
+                                                strokeWidth={1.5 / viewState.zoom}
+                                                strokeDasharray={`${6 / viewState.zoom} ${4 / viewState.zoom}`}
+                                            />
+                                        </>
+                                    ) : (
+                                        previewShape.render()
+                                    )}
+                                </g>
+                            )}
+                        </g>
                         {shapes.map((shape, idx) => renderShapeDetails(shape, idx))}
                         {renderSelectionPanel()}
-                        {previewShape && (
-                            <g opacity={0.75}>
-                                {(resolvedTool === "selector" || resolvedTool === "capture") && previewShape instanceof Rectangle ? (
-                                    <>
-                                        <rect
-                                            x={previewShape.origin.x}
-                                            y={previewShape.origin.y}
-                                            width={previewShape.width}
-                                            height={previewShape.height}
-                                            fill={resolvedTool === "capture" ? "rgba(245, 158, 11, 0.14)" : "rgba(78, 161, 255, 0.14)"}
-                                            stroke={resolvedTool === "capture" ? "#f59e0b" : "#4ea1ff"}
-                                            strokeWidth={1.5 / viewState.zoom}
-                                            strokeDasharray={`${6 / viewState.zoom} ${4 / viewState.zoom}`}
-                                        />
-                                    </>
-                                ) : (
-                                    previewShape.render()
-                                )}
-                            </g>
-                        )}
                     </g>
                 </svg>
             )}
