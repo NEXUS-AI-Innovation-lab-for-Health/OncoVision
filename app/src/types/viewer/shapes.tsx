@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
 import type { ShapeMetrics } from "./metrics";
 
+// Ce fichier définit les formes dessinables et la façon dont elles calculent
+// et affichent leurs métriques (longueur, aire, périmètre, bbox, etc.).
+// Les méthodes `getMetrics()` retournent des valeurs en pixels. Les
+// `renderLabel(..., scale)` acceptent un paramètre optionnel `scale` qui
+// permet de convertir px -> unité choisie (factor = valeur par pixel).
+
 export interface Point {
   x: number;
   y: number;
@@ -66,6 +72,8 @@ export class Line extends Shape implements Bordered {
     this.borderColor = borderColor;
     this.borderWidth = borderWidth;
   }
+
+  // Ligne: calcule longueur et bbox, affiche A/B et longueur convertie si demandé
 
   static fromJson(json: string): Line {
     const data = JSON.parse(json);
@@ -185,6 +193,9 @@ export class Circle extends Shape implements Bordered {
     this.borderColor = borderColor;
     this.borderWidth = borderWidth;
   }
+
+  // Cercle: calcule aire/périmètre à partir du rayon (pixels).
+  // Les labels affichent centre, rayon, diamètre, aire et périmètre.
 
   static fromJson(json: string): Circle {
     const data = JSON.parse(json);
@@ -325,6 +336,8 @@ export class Ellipse extends Shape implements Bordered {
     this.borderWidth = borderWidth;
   }
 
+  // Ellipse: calcule aire et périmètre approximatif; labels donnent rayons et valeurs.
+
   static fromJson(json: string): Ellipse {
     const data = JSON.parse(json);
     return new Ellipse(data.center, data.radiusX, data.radiusY, data.borderColor || "black", data.borderWidth || 1);
@@ -458,6 +471,8 @@ export class Rectangle extends Shape implements Bordered {
     this.borderColor = borderColor;
     this.borderWidth = borderWidth;
   }
+
+  // Rectangle: origine (coin) + largeur/hauteur; affiche dimensions, aire et périmètre.
 
   static fromJson(json: string): Rectangle {
     const data = JSON.parse(json);
@@ -595,6 +610,9 @@ export class Polygon extends Shape implements Bordered {
     this.borderColor = borderColor;
     this.borderWidth = borderWidth;
   }
+
+  // Polygone: calcule aire via formule de shoelace et périmètre par somme des arêtes.
+  // Le label montre la liste des points (préfixés a:, b:, ...), puis aire/périmètre/bbox.
 
   static fromJson(json: string): Polygon {
     const data = JSON.parse(json);
@@ -743,6 +761,8 @@ export class Polyline extends Shape implements Bordered {
     this.borderColor = borderColor;
     this.borderWidth = borderWidth;
   }
+
+  // Polyline: suite de segments (non fermée). getMetrics calcule la longueur totale.
 
   static fromJson(json: string): Polyline {
     const data = JSON.parse(json);

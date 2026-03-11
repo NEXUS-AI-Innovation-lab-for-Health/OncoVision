@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Slider, Button, Tooltip, Popover, InputNumber, Select, Space } from "antd";
-import { FiZoomIn, FiZoomOut, FiMaximize2, FiMinimize2, FiChevronLeft, FiChevronRight } from "react-icons/fi";
+import { FiZoomIn, FiZoomOut, FiMaximize2, FiMinimize2, FiChevronLeft, FiChevronRight, FiCamera } from "react-icons/fi";
 import { useRest } from "../../hooks/rest";
 import ImagePreview from "./preview"; // New import
 import Canva from "./canva";
 import type { CanvaHandle, CanvaTool } from "./canva";
+import html2canvas from "html2canvas";
 
 // Small inline icons to avoid extra dependencies and ensure consistent look on dark background
 const ToolIcon = ({ name, size = 14 }: { name: string; size?: number }) => {
@@ -539,6 +540,25 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
         }
     };
 
+    // Capture a screenshot of the current viewer container and trigger download
+    const takeScreenshot = async () => {
+        if (!containerRef.current) return;
+        try {
+            const canvas = await html2canvas(containerRef.current, { useCORS: true });
+            canvas.toBlob((blob) => {
+                if (!blob) return;
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'screenshot.png';
+                link.click();
+                URL.revokeObjectURL(url);
+            });
+        } catch (err) {
+            console.error('Screenshot error:', err);
+        }
+    };
+
     // Listen for fullscreen changes
     useEffect(() => {
         const handleFullscreenChange = () => {
@@ -754,6 +774,16 @@ export default function ImageViewer({ imageId }: ImageViewerProps) {
                             size="small"
                             icon={<FiMaximize2 size={isMobile ? 12 : 13} />}
                             onClick={fitToScreen}
+                            style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
+                        />
+                    </Tooltip>
+                    <Tooltip title="Capture d'écran" placement="right">
+                        <Button
+                            type="text"
+                            shape="circle"
+                            size="small"
+                            icon={<FiCamera size={isMobile ? 12 : 13} />}
+                            onClick={takeScreenshot}
                             style={{ color: '#E9EEF5', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
                         />
                     </Tooltip>
