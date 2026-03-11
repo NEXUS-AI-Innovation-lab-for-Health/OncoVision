@@ -158,6 +158,8 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     children,
 }: CanvaProps, ref) {
 
+    const imageClipPathId = useMemo(() => `canva-image-clip-${Math.random().toString(36).slice(2, 10)}`, []);
+
     const [internalTool] = useState<CanvaTool>("pan");
     const resolvedTool = activeTool ?? internalTool;
     const cursorRef = useRef<CanvaCursor | null>(null);
@@ -875,6 +877,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     const canvaStyle = useMemo<CSSProperties>(() => ({
         position: "absolute",
         inset: 0,
+        overflow: "hidden",
         pointerEvents: resolvedTool === "pan" ? "none" : "auto",
         zIndex: 1,
     }), [resolvedTool]);
@@ -1139,9 +1142,15 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                         <filter id="shape-detail-shadow" x="-30%" y="-30%" width="160%" height="160%">
                             <feDropShadow dx="0" dy="3" stdDeviation="5" floodColor="rgba(0,0,0,0.7)" floodOpacity="1" />
                         </filter>
+                        {typeof imageWidth === "number" && typeof imageHeight === "number" && (
+                            <clipPath id={imageClipPathId} clipPathUnits="userSpaceOnUse">
+                                <rect x={0} y={0} width={imageWidth} height={imageHeight} />
+                            </clipPath>
+                        )}
                     </defs>
                     <g
                         transform={`translate(${width / 2}, ${height / 2}) scale(${viewState.zoom}) translate(${-viewState.x}, ${-viewState.y})`}
+                        clipPath={typeof imageWidth === "number" && typeof imageHeight === "number" ? `url(#${imageClipPathId})` : undefined}
                     >
                         {shapes.map((shape, idx) => {
                             const elem = shape.render() as any;
