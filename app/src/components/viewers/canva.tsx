@@ -516,13 +516,17 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
 
     const toImagePointFromClient = (clientX: number, clientY: number, svg: SVGSVGElement): Point => {
         const rect = svg.getBoundingClientRect();
-        const x = clientX - rect.left;
-        const y = clientY - rect.top;
+        // Convert client coordinates to SVG pixel coordinates
+        const svgX = clientX - rect.left;
+        const svgY = clientY - rect.top;
+        
+        // Convert SVG pixel coordinates to image coordinates
+        // The SVG is centered and scaled by zoom
         const { x: cx, y: cy, zoom } = viewStateRef.current;
-
+        
         return {
-            x: (x - width / 2) / zoom + cx,
-            y: (y - height / 2) / zoom + cy,
+            x: (svgX - width / 2) / zoom + cx,
+            y: (svgY - height / 2) / zoom + cy,
         };
     };
 
