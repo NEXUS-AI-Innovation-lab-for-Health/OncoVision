@@ -2,6 +2,26 @@ import type { ReactNode } from "react";
 import type { UUIDTypes } from "uuid";
 import type { Properties } from "../../components/viewers/canva";
 
+interface DetailContext {
+    imageWidth?: number;
+    imageHeight?: number;
+}
+
+function getScales(properties: Properties, context?: DetailContext): { sx: number; sy: number } {
+    const { width, height } = properties.canva.dimension;
+    const imageWidth = context?.imageWidth;
+    const imageHeight = context?.imageHeight;
+
+    if (!imageWidth || !imageHeight || imageWidth <= 0 || imageHeight <= 0) {
+        return { sx: 1, sy: 1 };
+    }
+
+    return {
+        sx: width / imageWidth,
+        sy: height / imageHeight,
+    };
+}
+
 export interface Point {
     x: number;
     y: number;
@@ -19,7 +39,7 @@ export abstract class Shape {
 
     abstract render(): ReactNode;
 
-    details(properties: Properties): Record<string, {label: ReactNode, value: ReactNode}> {
+    details(properties: Properties, _context?: DetailContext): Record<string, {label: ReactNode, value: ReactNode}> {
         return {};
     }
 
@@ -105,9 +125,12 @@ export class Line extends Shape implements Bordered {
         );
     }
 
-    details(properties: Properties): Record<string, {label: ReactNode, value: ReactNode}> {
-        const length = Math.sqrt(Math.pow(this.end.x - this.start.x, 2) + Math.pow(this.end.y - this.start.y, 2));
-        const unit = properties.canva.unit;
+    details(properties: Properties, context?: DetailContext): Record<string, {label: ReactNode, value: ReactNode}> {
+        const { sx, sy } = getScales(properties, context);
+        const dx = (this.end.x - this.start.x) * sx;
+        const dy = (this.end.y - this.start.y) * sy;
+        const length = Math.sqrt(dx * dx + dy * dy);
+        const unit = properties.canva.dimension.unit;
         return {
             length: {
                 label: "Longueur",
@@ -150,13 +173,16 @@ export class Circle extends Shape implements Bordered {
         );
     }
 
-    details(properties: Properties): Record<string, {label: ReactNode, value: ReactNode}> {
-        const area = Math.PI * this.radius * this.radius;
-        const unit = properties.canva.unit;
+    details(properties: Properties, context?: DetailContext): Record<string, {label: ReactNode, value: ReactNode}> {
+        const { sx, sy } = getScales(properties, context);
+        const avgScale = (sx + sy) / 2;
+        const radius = this.radius * avgScale;
+        const area = Math.PI * this.radius * this.radius * sx * sy;
+        const unit = properties.canva.dimension.unit;
         return {
             radius: {
                 label: "Rayon",
-                value: `${this.radius.toFixed(2)} ${unit}`
+                value: `${radius.toFixed(2)} ${unit}`
             },
             area: {
                 label: "Aire",
@@ -202,17 +228,18 @@ export class Ellipse extends Shape implements Bordered {
         );
     }
 
-    details(properties: Properties): Record<string, {label: ReactNode, value: ReactNode}> {
-        const area = this.radiusX * this.radiusY;
-        const unit = properties.canva.unit;
+    details(properties: Properties, context?: DetailContext): Record<string, {label: ReactNode, value: ReactNode}> {
+        const { sx, sy } = getScales(properties, context);
+        const area = this.radiusX * this.radiusY * sx * sy;
+        const unit = properties.canva.dimension.unit;
         return {
             radiusX: {
                 label: "Rayon X",
-                value: `${this.radiusX.toFixed(2)} ${unit}`
+                value: `${(this.radiusX * sx).toFixed(2)} ${unit}`
             },
             radiusY: {
                 label: "Rayon Y",
-                value: `${this.radiusY.toFixed(2)} ${unit}`
+                value: `${(this.radiusY * sy).toFixed(2)} ${unit}`
             },
             area: {
                 label: "Aire",
@@ -258,17 +285,20 @@ export class Rectangle extends Shape implements Bordered {
         );
     }
 
-    details(properties: Properties): Record<string, {label: ReactNode, value: ReactNode}> {
-        const area = this.width * this.height;
-        const unit = properties.canva.unit;
+    details(properties: Properties, context?: DetailContext): Record<string, {label: ReactNode, value: ReactNode}> {
+        const { sx, sy } = getScales(properties, context);
+        const scaledWidth = this.width * sx;
+        const scaledHeight = this.height * sy;
+        const area = scaledWidth * scaledHeight;
+        const unit = properties.canva.dimension.unit;
         return {
             width: {
                 label: "Largeur",
-                value: `${this.width.toFixed(2)} ${unit}`
+                value: `${scaledWidth.toFixed(2)} ${unit}`
             },
             height: {
                 label: "Hauteur",
-                value: `${this.height.toFixed(2)} ${unit}`
+                value: `${scaledHeight.toFixed(2)} ${unit}`
             },
             area: {
                 label: "Aire",
@@ -312,9 +342,10 @@ export class Polygon extends Shape implements Bordered {
         return Math.abs(area / 2);
     }
 
-    details(properties: Properties): Record<string, {label: ReactNode, value: ReactNode}> {
-        const area = this.points.length > 2 ? this.calculateArea() : 0;
-        const unit = properties.canva.unit;
+    details(properties: Properties, context?: DetailContext): Record<string, {label: ReactNode, value: ReactNode}> {
+        const { sx, sy } = getScales(properties, context);
+        const area = this.points.length > 2 ? this.calculateArea() * sx * sy : 0;
+        const unit = properties.canva.dimension.unit;
         return {
             points: {
                 label: "Points",
@@ -351,13 +382,14 @@ export class Polyline extends Shape implements Bordered {
         return <polyline points={pointsStr} stroke={this.borderColor} strokeWidth={this.borderWidth} fill="none" />;
     }
 
-    details(properties: Properties): Record<string, {label: ReactNode, value: ReactNode}> {
+    details(properties: Properties, context?: DetailContext): Record<string, {label: ReactNode, value: ReactNode}> {
+        const { sx, sy } = getScales(properties, context);
         const length = this.points.reduce((acc, p, i) => {
             if (i === 0) return acc;
             const prev = this.points[i - 1];
-            return acc + Math.hypot(p.x - prev.x, p.y - prev.y);
+            return acc + Math.hypot((p.x - prev.x) * sx, (p.y - prev.y) * sy);
         }, 0);
-        const unit = properties.canva.unit;
+        const unit = properties.canva.dimension.unit;
         return {
             points: {
                 label: "Points",

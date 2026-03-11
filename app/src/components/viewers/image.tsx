@@ -80,6 +80,7 @@ export default function ImageViewer(props: ImageViewerProps) {
     const [canvasSize, setCanvasSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
     const [activeTool, setActiveTool] = useState<CanvaTool>("pan");
     const [properties, setProperties] = useState<Properties>(DEFAULT_PROPERTIES);
+    const initializedDimensionForImageRef = useRef<string | null>(null);
 
     const getFitZoom = useCallback(() => {
         if (!infoRef.current || !containerRef.current) return 0.001;
@@ -103,6 +104,24 @@ export default function ImageViewer(props: ImageViewerProps) {
     useEffect(() => {
         infoRef.current = info;
     }, [info]);
+
+    useEffect(() => {
+        if (!info || !imageId) return;
+        if (initializedDimensionForImageRef.current === imageId) return;
+
+        initializedDimensionForImageRef.current = imageId;
+        setProperties((prev) => ({
+            ...prev,
+            canva: {
+                ...prev.canva,
+                dimension: {
+                    width: info.width,
+                    height: info.height,
+                    unit: "px",
+                },
+            },
+        }));
+    }, [info, imageId]);
 
     useEffect(() => {
         viewStateRef.current = viewState;

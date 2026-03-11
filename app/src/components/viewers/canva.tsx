@@ -28,9 +28,15 @@ export interface CanvaViewState {
 
 export type MeterUnit = "px" | "mm" | "µm" | "nm";
 
+export interface CanvaDimension {
+    width: number;
+    height: number;
+    unit: MeterUnit;
+}
+
 export interface Properties {
     canva: {
-        unit: MeterUnit;
+        dimension: CanvaDimension;
     };
     shape: {
         details: boolean;
@@ -43,7 +49,11 @@ export interface Properties {
 
 export const DEFAULT_PROPERTIES: Properties = {
     canva: {
-        unit: "px",
+        dimension: {
+            width: 1,
+            height: 1,
+            unit: "px",
+        },
     },
     shape: {
         details: true,
@@ -960,7 +970,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         if (isSelected && selectedShapeIds.size > 1) return null;
         if (!properties.shape.details && !isSelected) return null;
 
-        const details = shape.details(properties);
+        const details = shape.details(properties, { imageWidth, imageHeight });
         const detailEntries = Object.values(details);
         if (!detailEntries.length) return null;
 

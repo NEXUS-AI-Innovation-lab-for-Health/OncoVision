@@ -14,10 +14,13 @@ export default function ToolSettings(props: ToolSettingsProps) {
     const { canva, setProperties } = props;
     // local copies
     const currentStroke = canva.properties?.shape.strike ?? DEFAULT_PROPERTIES.shape.strike;
-    const currentUnit: MeterUnit = canva.properties?.canva.unit ?? DEFAULT_PROPERTIES.canva.unit;
+    const currentDimension = canva.properties?.canva.dimension ?? DEFAULT_PROPERTIES.canva.dimension;
+    const currentUnit: MeterUnit = currentDimension.unit;
     const currentDetails = canva.properties?.shape.details ?? DEFAULT_PROPERTIES.shape.details;
     const [color, setColor] = useState<string>(currentStroke.color);
     const [width, setWidth] = useState<number>(currentStroke.width);
+    const [dimensionWidth, setDimensionWidth] = useState<number>(currentDimension.width);
+    const [dimensionHeight, setDimensionHeight] = useState<number>(currentDimension.height);
     const [unit, setUnit] = useState<MeterUnit>(currentUnit);
     const [details, setDetails] = useState<boolean>(currentDetails);
 
@@ -33,7 +36,23 @@ export default function ToolSettings(props: ToolSettingsProps) {
 
     useEffect(() => {
         setUnit(currentUnit);
-    }, [currentUnit]);
+        setDimensionWidth(currentDimension.width);
+        setDimensionHeight(currentDimension.height);
+    }, [currentUnit, currentDimension.width, currentDimension.height]);
+
+    const updateDimension = (nextWidth: number, nextHeight: number, nextUnit: MeterUnit) => {
+        setProperties((prev) => ({
+            ...prev,
+            canva: {
+                ...prev.canva,
+                dimension: {
+                    width: nextWidth,
+                    height: nextHeight,
+                    unit: nextUnit,
+                },
+            },
+        }));
+    };
 
     const updateStroke = (newColor: string, newWidth: number) => {
         setProperties((prev) => ({
@@ -50,13 +69,21 @@ export default function ToolSettings(props: ToolSettingsProps) {
 
     const onUnitChange = (newUnit: MeterUnit) => {
         setUnit(newUnit);
-        setProperties((prev) => ({
-            ...prev,
-            canva: {
-                ...prev.canva,
-                unit: newUnit,
-            },
-        }));
+        updateDimension(dimensionWidth, dimensionHeight, newUnit);
+    };
+
+    const onDimensionWidthChange = (value: number | null) => {
+        if (typeof value !== "number") return;
+        if (value <= 0) return;
+        setDimensionWidth(value);
+        updateDimension(value, dimensionHeight, unit);
+    };
+
+    const onDimensionHeightChange = (value: number | null) => {
+        if (typeof value !== "number") return;
+        if (value <= 0) return;
+        setDimensionHeight(value);
+        updateDimension(dimensionWidth, value, unit);
     };
 
     const onDetailsChange = (checked: boolean) => {
@@ -108,6 +135,33 @@ export default function ToolSettings(props: ToolSettingsProps) {
                         ]}
                         style={{ width: "100%" }}
                     />
+                </div>
+
+                <div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 4 }}>
+                        <label>Largeur</label>
+                        <label>Hauteur</label>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        <InputNumber
+                            min={0.0001}
+                            value={dimensionWidth}
+                            onChange={onDimensionWidthChange}
+                            size="small"
+                            formatter={(v) => `${v}${unit}`}
+                            parser={(v) => (v ? parseFloat(v.replace(unit, "")) : 0)}
+                            style={{ width: "100%" }}
+                        />
+                        <InputNumber
+                            min={0.0001}
+                            value={dimensionHeight}
+                            onChange={onDimensionHeightChange}
+                            size="small"
+                            formatter={(v) => `${v}${unit}`}
+                            parser={(v) => (v ? parseFloat(v.replace(unit, "")) : 0)}
+                            style={{ width: "100%" }}
+                        />
+                    </div>
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
