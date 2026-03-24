@@ -3,7 +3,7 @@ import { useRest } from "../../hooks/rest";
 import Toolbar from "./tool/bar";
 import ImagePreview from "./preview"; // New import
 import Canva from "./canva";
-import CaptureDialog from "./capture-dialog";
+import CaptureDialog from "./capture";
 import type { CanvaHandle, CanvaTool, CanvaProps, Properties } from "./canva";
 import { DEFAULT_PROPERTIES } from "./canva";
 import { Circle, Ellipse, Line, Polygon, Polyline, Rectangle } from "../../types/viewer/shapes";
@@ -146,7 +146,7 @@ export default function ImageViewer(props: ImageViewerProps) {
 
     // Capture state
     const [captureDialogOpen, setCaptureDialogOpen] = useState(false);
-    const [captureRenderFn, setCaptureRenderFn] = useState<((canvas: HTMLCanvasElement) => Promise<void>) | null>(null);
+    const [captureRenderFn, setCaptureRenderFn] = useState<((canvas: HTMLCanvasElement, options?: { showShapes?: boolean }) => Promise<void>) | null>(null);
 
     const getFitZoom = useCallback(() => {
         if (!infoRef.current || !containerRef.current) return 0.001;
@@ -223,7 +223,7 @@ export default function ImageViewer(props: ImageViewerProps) {
         rect: { x: number; y: number; width: number; height: number },
         shapes: Shape[],
     ) => {
-        return async (outputCanvas: HTMLCanvasElement) => {
+        return async (outputCanvas: HTMLCanvasElement, options?: { showShapes?: boolean }) => {
             if (!infoRef.current) return;
             const currentInfo = infoRef.current;
             const ctx = outputCanvas.getContext("2d");
@@ -314,14 +314,16 @@ export default function ImageViewer(props: ImageViewerProps) {
             }
             await Promise.all(tilePromises);
 
-            // Dessiner les shapes par-dessus en coordonnées image
-            ctx.save();
-            ctx.translate(-rect.x * scaleX, -rect.y * scaleY);
-            ctx.scale(scaleX, scaleY);
-            for (const shape of shapes) {
-                drawShapeOnCanvas(ctx, shape);
+            if (options?.showShapes ?? true) {
+                // Dessiner les shapes par-dessus en coordonnées image
+                ctx.save();
+                ctx.translate(-rect.x * scaleX, -rect.y * scaleY);
+                ctx.scale(scaleX, scaleY);
+                for (const shape of shapes) {
+                    drawShapeOnCanvas(ctx, shape);
+                }
+                ctx.restore();
             }
-            ctx.restore();
         };
     }, [imageId, get]);
 

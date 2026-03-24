@@ -1,18 +1,23 @@
-import { Modal, Button, Spin, message } from "antd";
+import { Modal, Button, Spin, Switch, message } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { MdContentCopy, MdDownload } from "react-icons/md";
 
 interface CaptureDialogProps {
     open: boolean;
     onClose: () => void;
-    /** Fonction fournie par image.tsx pour rendre la capture dans un canvas. */
-    renderCapture: ((canvas: HTMLCanvasElement) => Promise<void>) | null;
+    renderCapture: ((canvas: HTMLCanvasElement, options?: { showShapes?: boolean }) => Promise<void>) | null;
 }
 
 export default function CaptureDialog({ open, onClose, renderCapture }: CaptureDialogProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [loading, setLoading] = useState(false);
+    const [showShapes, setShowShapes] = useState(true);
     const [messageApi, contextHolder] = message.useMessage();
+
+    useEffect(() => {
+        if (!open) return;
+        setShowShapes(true);
+    }, [open]);
 
     useEffect(() => {
         if (!open || !renderCapture) return;
@@ -21,10 +26,10 @@ export default function CaptureDialog({ open, onClose, renderCapture }: CaptureD
             const canvas = canvasRef.current;
             if (!canvas) return;
             setLoading(true);
-            renderCapture(canvas).finally(() => setLoading(false));
+            renderCapture(canvas, { showShapes }).finally(() => setLoading(false));
         }, 0);
         return () => clearTimeout(timer);
-    }, [open, renderCapture]);
+    }, [open, renderCapture, showShapes]);
 
     const handleCopy = () => {
         const canvas = canvasRef.current;
@@ -60,7 +65,16 @@ export default function CaptureDialog({ open, onClose, renderCapture }: CaptureD
                 title="Capture de sélection"
                 width={860}
                 footer={
-                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                    <div style={{ display: "flex", gap: 12, justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <span>Afficher les formes</span>
+                            <Switch
+                                checked={showShapes}
+                                onChange={setShowShapes}
+                                disabled={loading}
+                            />
+                        </div>
+                        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                         <Button
                             icon={<MdContentCopy size={16} />}
                             onClick={handleCopy}
@@ -76,6 +90,7 @@ export default function CaptureDialog({ open, onClose, renderCapture }: CaptureD
                         >
                             Télécharger
                         </Button>
+                        </div>
                     </div>
                 }
             >
