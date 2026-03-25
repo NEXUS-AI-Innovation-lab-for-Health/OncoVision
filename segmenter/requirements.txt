@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+python-multipart
+torch
+PILLOW
+numpy<2.0.0
+instanseg-torch @ git+https://github.com/instanseg/instanseg.git

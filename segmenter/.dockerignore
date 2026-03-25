@@ -1,0 +1,27 @@
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Tooling / tests cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# VCS and editor files
+.git/
+.gitignore
+.DS_Store
+
+# Local notebooks and logs
+*.ipynb
+*.log
+
+# Keep Docker context small
+*.tar

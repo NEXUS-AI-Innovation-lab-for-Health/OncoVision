@@ -10,6 +10,6 @@ interface Window {
 }
 
 interface ImportMetaEnv {
-  readonly VITE_API_URL?: string;
   readonly API_URL?: string;
+  readonly SEGMENTATION_API_URL?: string;
 }
