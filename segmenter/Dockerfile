@@ -6,17 +6,25 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Needed by requirements containing a git dependency and common imaging/runtime libs.
+# Install build dependencies, runtime libs, and clean up
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
     git \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
     libxrender1 \
-    && rm -rf /var/lib/apt/lists/*
+    && pip install --upgrade pip \
+    && pip install --no-cache-dir \
+        wheel \
+        setuptools \
+    && rm -rf /var/lib/apt/lists/* /root/.cache/pip/*
 
 COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Remove build dependencies to reduce image size
+RUN apt-get purge -y --auto-remove build-essential git
 
 COPY api.py .
 
