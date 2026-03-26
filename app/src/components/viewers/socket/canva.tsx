@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import type { MutableRefObject } from "react";
 import type { CanvaHandle, CanvaProps } from "../canva";
 import Canva from "../canva";
 import { useRest } from "../../../hooks/rest";
@@ -32,13 +33,15 @@ export type CanvaSocketProps = CanvaProps & {
     authorId?: string | null;
     authorName?: string;
     onHandshaked?: (authorId: string, color: string) => void;
+    /** Set by parent to receive a function that sends the leave message and disconnects. */
+    leaveRef?: MutableRefObject<(() => Promise<void>) | null>;
 }
 
 const CanvaSocket = forwardRef<CanvaHandle, CanvaSocketProps>(function CanvaSocket(
     props: CanvaSocketProps,
     ref
 ) {
-    const { roomId, authorId: initialAuthorId, authorName = "Anonymous", onHandshaked, ...canvaProps } = props;
+    const { roomId, authorId: initialAuthorId, authorName = "Anonymous", onHandshaked, leaveRef, ...canvaProps } = props;
 
     const handleRef = useRef<CanvaHandle | null>(null);
 
@@ -55,6 +58,24 @@ const CanvaSocket = forwardRef<CanvaHandle, CanvaSocketProps>(function CanvaSock
 
     // Pending history to restore after shapes are set
     const pendingHistoryRef = useRef<{ past: DrawingAction[]; future: DrawingAction[] } | null>(null);
+
+    /** Sends a leave message to the server then closes the connection. */
+    const leave = async (): Promise<void> => {
+        webSocketBus.current.publish({
+            type: "leave",
+            roomId: roomIdRef.current,
+        });
+        // Give the message time to be sent before closing
+        await new Promise<void>((resolve) => setTimeout(resolve, 150));
+        webSocket.disconnect();
+    };
+
+    useEffect(() => {
+        if (leaveRef) {
+            leaveRef.current = leave;
+            return () => { leaveRef.current = null; };
+        }
+    }, [leaveRef]);
 
     useEffect(() => {
         if (handleRef.current) {

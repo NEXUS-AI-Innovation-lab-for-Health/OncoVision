@@ -1,5 +1,5 @@
 import { Button, Space, Tag, Typography } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FaUpload, FaSignOutAlt } from "react-icons/fa";
 import { useRest } from "../../hooks/rest";
 import ImageViewer from "../viewers/image";
@@ -21,6 +21,9 @@ export default function ImageUploader({ room, author, onLeaveRoom }: ImageUpload
     const [authorId, setAuthorId] = useState<string | null>(author.authorId);
     const [authorColor, setAuthorColor] = useState<string>("#888888");
     const [showUpload, setShowUpload] = useState(false);
+
+    // Ref populated by CanvaSocket so we can trigger a clean leave
+    const canvaSocketLeaveRef = useRef<(() => Promise<void>) | null>(null);
 
     const { useQuery, post } = useRest();
     const { data, refetch } = useQuery<any>({
@@ -59,11 +62,21 @@ export default function ImageUploader({ room, author, onLeaveRoom }: ImageUpload
         sessionStorage.setItem(`authorId:${room.roomId}`, newAuthorId);
     };
 
+    const handleLeaveRoom = async () => {
+        // Send leave message (deletes author's shapes on the server and propagates)
+        if (canvaSocketLeaveRef.current) {
+            await canvaSocketLeaveRef.current();
+        }
+        // Clear the stored author identity so they get a fresh one if they rejoin
+        sessionStorage.removeItem(`authorId:${room.roomId}`);
+        onLeaveRoom();
+    };
+
     return (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             {/* Room header bar */}
             <div style={{ padding: '8px 16px', background: '#f0f2f5', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-                <Button danger icon={<FaSignOutAlt />} onClick={onLeaveRoom} size="small">
+                <Button danger icon={<FaSignOutAlt />} onClick={handleLeaveRoom} size="small">
                     Leave Room
                 </Button>
                 <Text strong>{room.roomName}</Text>
@@ -115,6 +128,7 @@ export default function ImageUploader({ room, author, onLeaveRoom }: ImageUpload
                         authorId,
                         authorName: author.authorName,
                         onHandshaked: handleHandshaked,
+                        leaveRef: canvaSocketLeaveRef,
                     },
                 }} />
             </div>

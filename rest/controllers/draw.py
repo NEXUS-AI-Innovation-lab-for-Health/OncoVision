@@ -18,6 +18,7 @@ class DrawAuthor:
     color: str
     past_actions: list[dict]
     future_actions: list[dict]
+    shape_ids: set[str]
 
     def __init__(self, author_id: str, name: str, color: str):
         self.author_id = author_id
@@ -25,6 +26,7 @@ class DrawAuthor:
         self.color = color
         self.past_actions = []
         self.future_actions = []
+        self.shape_ids = set()
 
 
 class DrawSession:
@@ -129,6 +131,10 @@ class ShapeActionMessage(WebSocketMessage, type="shape_action"):
 class PropagateShapeActionMessage(WebSocketMessage, type="propagate_shape_action"):
     room_id: str
     action: DrawingActionUnion
+
+
+class LeaveMessage(WebSocketMessage, type="leave"):
+    room_id: str
 
 
 class DrawController(Controller, WebSocketHandler):
@@ -271,6 +277,15 @@ class DrawController(Controller, WebSocketHandler):
         self._apply_action(session, action)
         self._update_author_history(author, message.action, message.source)
 
+        # Track which shapes belong to this author
+        if isinstance(action, ShapeCreateAction):
+            for shape in action.shapes:
+                author.shape_ids.add(str(shape.id))
+        elif isinstance(action, ShapeDeleteAction):
+            deleted_ids = {str(shape.id) for shape in action.shapes}
+            for a in session.known_authors.values():
+                a.shape_ids -= deleted_ids
+
         self.collection.update_one(
             {"room_id": session.room_id},
             {"$set": session.as_document()},
@@ -283,6 +298,42 @@ class DrawController(Controller, WebSocketHandler):
                     room_id=message.room_id,
                     action=action,
                 ))
+
+    @websocket_subscribe("leave", LeaveMessage)
+    async def handle_leave(self, websocket: WebSocket, message: LeaveMessage) -> None:
+
+        session = self.sessions.get(message.room_id)
+        if not session or websocket not in session.authors:
+            await websocket.close(code=1000)
+            return
+
+        author = session.authors[websocket]
+
+        # Find shapes that belong to the leaving author and delete them
+        shapes_to_delete = [s for s in session.shapes if str(s.id) in author.shape_ids]
+
+        if shapes_to_delete:
+            delete_action = ShapeDeleteAction(shapes=shapes_to_delete)
+            self._apply_action(session, delete_action)
+
+            self.collection.update_one(
+                {"room_id": session.room_id},
+                {"$set": session.as_document()},
+                upsert=True,
+            )
+
+            for ws in list(session.authors.keys()):
+                if ws != websocket:
+                    await self.send_message(ws, PropagateShapeActionMessage(
+                        room_id=message.room_id,
+                        action=delete_action,
+                    ))
+
+        # Remove author from session entirely
+        del session.authors[websocket]
+        session.known_authors.pop(author.author_id, None)
+
+        await websocket.close(code=1000)
 
     async def on_socket_disconnect(self, websocket, error=None):
         print(f"WebSocket disconnected: {error}")
