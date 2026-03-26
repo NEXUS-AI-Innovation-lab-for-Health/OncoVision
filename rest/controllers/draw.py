@@ -8,7 +8,7 @@ from api.controller import Controller
 from api.model import CamelModel
 from api.websocket import WebSocketHandler, WebSocketMessage, websocket_subscribe
 from database.mongo.connection import MongoConnection
-from models.form import Bordered, Point, Shape, ShapeUnion
+from models.form import Bordered, ShapeUnion
 
 class DrawAuthor:
     color: str
@@ -58,22 +58,22 @@ class DrawingAction(CamelModel):
 
 class ShapeCreateAction(DrawingAction):
     type: Literal["shape_create"] = "shape_create"
+    shapes: list[ShapeUnion]
+
+
+class ShapeDeleteAction(DrawingAction):
+    type: Literal["shape_delete"] = "shape_delete"
+    shapes: list[ShapeUnion]
+
+
+class ShapeEditAction(DrawingAction):
+    type: Literal["shape_edit"] = "shape_edit"
+    previous_shape: ShapeUnion
     shape: ShapeUnion
 
 
-class ShapesDeleteAction(DrawingAction):
-    type: Literal["shapes_delete"] = "shapes_delete"
-    shapes: list[ShapeUnion]
-
-
-class ShapeMoveAction(DrawingAction):
-    type: Literal["shape_move"] = "shape_move"
-    shapes: list[ShapeUnion]
-    offset: Point
-
-
 DrawingActionUnion = Annotated[
-    ShapeCreateAction | ShapesDeleteAction | ShapeMoveAction,
+    ShapeCreateAction | ShapeDeleteAction | ShapeEditAction,
     Field(discriminator="type"),
 ]
 
@@ -100,53 +100,26 @@ class DrawController(Controller, WebSocketHandler):
         self.add_api_websocket_route(f"/join_draw", self.handle_socket)
 
     @staticmethod
-    def _copy_geometry(target: ShapeUnion, source: ShapeUnion) -> None:
-        if hasattr(target, "start") and hasattr(target, "end") and hasattr(source, "start") and hasattr(source, "end"):
-            target.start.x = source.start.x
-            target.start.y = source.start.y
-            target.end.x = source.end.x
-            target.end.y = source.end.y
-            return
-
-        if hasattr(target, "center") and hasattr(source, "center"):
-            target.center.x = source.center.x
-            target.center.y = source.center.y
-            return
-
-        if hasattr(target, "origin") and hasattr(source, "origin"):
-            target.origin.x = source.origin.x
-            target.origin.y = source.origin.y
-            return
-
-        if hasattr(target, "points") and hasattr(source, "points"):
-            for index, point in enumerate(target.points):
-                if index >= len(source.points):
-                    break
-                point.x = source.points[index].x
-                point.y = source.points[index].y
-
-    @staticmethod
     def _normalize_action(author: DrawAuthor | None, action: DrawingActionUnion) -> DrawingActionUnion:
-        if isinstance(action, ShapeCreateAction) and author and isinstance(action.shape, Bordered):
-            action.shape.border_color = author.color
+        if isinstance(action, ShapeCreateAction) and author:
+            for shape in action.shapes:
+                if isinstance(shape, Bordered):
+                    shape.border_color = author.color
         return action
 
     def _apply_action(self, session: DrawSession, action: DrawingActionUnion) -> None:
         if isinstance(action, ShapeCreateAction):
-            session.shapes.append(action.shape)
+            session.shapes.extend(action.shapes)
             return
 
-        if isinstance(action, ShapesDeleteAction):
+        if isinstance(action, ShapeDeleteAction):
             ids = {shape.id for shape in action.shapes}
             session.shapes = [shape for shape in session.shapes if shape.id not in ids]
             return
 
-        if isinstance(action, ShapeMoveAction):
-            moved = {shape.id: shape for shape in action.shapes}
-            for shape in session.shapes:
-                target = moved.get(shape.id)
-                if target is not None:
-                    self._copy_geometry(shape, target)
+        if isinstance(action, ShapeEditAction):
+            shape_id = action.shape.id
+            session.shapes = [action.shape if shape.id == shape_id else shape for shape in session.shapes]
 
     @websocket_subscribe("handshake", HandshakeMessage)
     async def handle_handshake(self, websocket: WebSocket, message: HandshakeMessage) -> None:
