@@ -73,11 +73,16 @@ function ImageThumb({ imageId, selected, onClick, get, width = 140, height = 90 
                 alignItems: "center",
             }}
         >
-            <div style={{ width, height, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {loading ? (
-                    <Spin size="small" />
-                ) : (
-                    <canvas ref={canvasRef} width={width} height={height} />
+            <div style={{ width, height, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                {/* Canvas is always mounted so canvasRef is always set when onload fires */}
+                <canvas
+                    ref={canvasRef}
+                    width={width}
+                    height={height}
+                    style={{ display: loading ? "none" : "block" }}
+                />
+                {loading && (
+                    <Spin size="small" style={{ position: "absolute" }} />
                 )}
             </div>
             <Text

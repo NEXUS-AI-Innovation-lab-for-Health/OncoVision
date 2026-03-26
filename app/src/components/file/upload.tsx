@@ -1,6 +1,6 @@
-import { Button, Divider, Space, Tag, Typography } from "antd";
+import { Button, Space, Tag, Typography } from "antd";
 import { useEffect, useState } from "react";
-import { FaUpload, FaArrowLeft } from "react-icons/fa";
+import { FaUpload, FaSignOutAlt } from "react-icons/fa";
 import { useRest } from "../../hooks/rest";
 import ImageViewer from "../viewers/image";
 import CanvaSocket from "../viewers/socket/canva";
@@ -63,8 +63,8 @@ export default function ImageUploader({ room, author, onLeaveRoom }: ImageUpload
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             {/* Room header bar */}
             <div style={{ padding: '8px 16px', background: '#f0f2f5', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-                <Button icon={<FaArrowLeft />} onClick={onLeaveRoom} size="small">
-                    Rooms
+                <Button danger icon={<FaSignOutAlt />} onClick={onLeaveRoom} size="small">
+                    Leave Room
                 </Button>
                 <Text strong>{room.roomName}</Text>
                 <Text type="secondary" style={{ fontSize: 11 }}>ID: {room.roomId}</Text>
