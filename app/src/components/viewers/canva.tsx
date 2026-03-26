@@ -77,6 +77,10 @@ export type CanvaProps = {
     onViewStateChange?: (updater: (prev: CanvaViewState) => CanvaViewState) => void;
     /** Appelé à chaque action utilisateur (création, suppression, déplacement). */
     onAction?: (action: DrawingAction) => void;
+    /** Appelé lorsqu'un undo est propagé vers des clients distants. */
+    onUndoAction?: (inverseAction: DrawingAction) => void;
+    /** Appelé lorsqu'un redo est propagé vers des clients distants. */
+    onRedoAction?: (action: DrawingAction) => void;
     /** Appelé quand l'état de l'historique change (utile pour activer/désactiver les boutons). */
     onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
     /** Appelé quand l'outil capture termine une sélection. */
@@ -95,6 +99,7 @@ export interface CanvaHandle {
     setShapes: (shapes: Shape[]) => void;
     undo: () => void;
     redo: () => void;
+    restoreHistory: (past: DrawingAction[], future: DrawingAction[]) => void;
 }
 
 // Calcule le delta réel entre une shape déplacée et son clone original.
@@ -126,6 +131,8 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     onDrawingActiveChange,
     onViewStateChange,
     onAction,
+    onUndoAction,
+    onRedoAction,
     onHistoryChange,
     onCapture,
     imageWidth,
@@ -151,6 +158,10 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     const history = useHistory();
     const onActionRef = useRef(onAction);
     useEffect(() => { onActionRef.current = onAction; }, [onAction]);
+    const onUndoActionRef = useRef(onUndoAction);
+    useEffect(() => { onUndoActionRef.current = onUndoAction; }, [onUndoAction]);
+    const onRedoActionRef = useRef(onRedoAction);
+    useEffect(() => { onRedoActionRef.current = onRedoAction; }, [onRedoAction]);
     const onHistoryChangeRef = useRef(onHistoryChange);
     useEffect(() => { onHistoryChangeRef.current = onHistoryChange; }, [onHistoryChange]);
     const onCaptureRef = useRef(onCapture);
@@ -468,6 +479,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     const undo = () => {
         const action = history.undo();
         if (!action) return;
+        const propagate = onUndoActionRef.current ?? onActionRef.current;
         if (action instanceof ShapeCreateAction) {
             const ids = new Set(action.shapes.map(s => s.getId() as string));
             setShapes(prev => prev.filter(s => !ids.has(s.getId() as string)));
@@ -478,15 +490,15 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                 return next;
             });
             // Propagate inverse action so remote clients stay in sync
-            onActionRef.current?.(new ShapeDeleteAction(action.shapes));
+            propagate?.(new ShapeDeleteAction(action.shapes));
         } else if (action instanceof ShapeDeleteAction) {
             setShapes(prev => [...prev, ...action.shapes]);
-            onActionRef.current?.(new ShapeCreateAction(action.shapes));
+            propagate?.(new ShapeCreateAction(action.shapes));
         } else if (action instanceof ShapeEditAction) {
             const id = action.previousShape.getId() as string;
             setShapes(prev => prev.map(s => (s.getId() as string) === id ? action.previousShape : s));
             // Propagate a shape_edit with swapped before/after so remotes restore the previous state
-            onActionRef.current?.(new ShapeEditAction(action.shape, action.previousShape));
+            propagate?.(new ShapeEditAction(action.shape, action.previousShape));
         }
         notifyHistory();
     };
@@ -494,9 +506,10 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     const redo = () => {
         const action = history.redo();
         if (!action) return;
+        const propagate = onRedoActionRef.current ?? onActionRef.current;
         if (action instanceof ShapeCreateAction) {
             setShapes(prev => [...prev, ...action.shapes]);
-            onActionRef.current?.(new ShapeCreateAction(action.shapes));
+            propagate?.(new ShapeCreateAction(action.shapes));
         } else if (action instanceof ShapeDeleteAction) {
             const ids = new Set(action.shapes.map(s => s.getId() as string));
             setShapes(prev => prev.filter(s => !ids.has(s.getId() as string)));
@@ -506,11 +519,11 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                 for (const id of ids) next.delete(id);
                 return next;
             });
-            onActionRef.current?.(new ShapeDeleteAction(action.shapes));
+            propagate?.(new ShapeDeleteAction(action.shapes));
         } else if (action instanceof ShapeEditAction) {
             const id = action.shape.getId() as string;
             setShapes(prev => prev.map(s => (s.getId() as string) === id ? action.shape : s));
-            onActionRef.current?.(new ShapeEditAction(action.previousShape, action.shape));
+            propagate?.(new ShapeEditAction(action.previousShape, action.shape));
         }
         notifyHistory();
     };
@@ -697,6 +710,11 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         setIsDrawing(false);
     };
 
+    const restoreHistory = (past: DrawingAction[], future: DrawingAction[]) => {
+        history.restore(past, future);
+        notifyHistory();
+    };
+
     useImperativeHandle(ref, () => {
         const handle = {
             addShape: (shape: Shape) => addShape(shape, true),
@@ -706,9 +724,10 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
             setShapes: setShapesExternal,
             undo,
             redo,
+            restoreHistory,
         };
         return handle;
-    }, [addShape, removeShape, applyAction, setListener, setShapesExternal, undo, redo]);
+    }, [addShape, removeShape, applyAction, setListener, setShapesExternal, undo, redo, restoreHistory]);
 
     const toImagePoint = (e: React.PointerEvent<SVGSVGElement>): Point => {
         const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();

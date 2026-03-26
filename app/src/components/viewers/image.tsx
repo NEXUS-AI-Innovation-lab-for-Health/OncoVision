@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, type ComponentType, type ForwardRefExoticComponent, type RefAttributes } from "react";
+import { useEffect, useRef, useState, useCallback, type ComponentType, type ForwardRefExoticComponent } from "react";
 import { useRest } from "../../hooks/rest";
 import Toolbar from "./tool/bar";
 import ImagePreview from "./preview"; // New import
@@ -12,8 +12,9 @@ import type { Shape } from "../../types/viewer/shapes";
 interface ImageViewerProps {
     imageId: string;
     canva?: {
-        type: ComponentType<CanvaProps> | ForwardRefExoticComponent<CanvaProps & RefAttributes<CanvaHandle>>;
-        props?: Partial<CanvaProps>;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        type: ComponentType<any> | ForwardRefExoticComponent<any>;
+        props?: Partial<CanvaProps> & Record<string, unknown>;
     };
 }
 

@@ -4,23 +4,41 @@ import Canva from "../canva";
 import { useRest } from "../../../hooks/rest";
 import { subscribe, WebSocketBus, type WebSocketMessage } from "../../../utils/websocket";
 import { Shape } from "../../../types/viewer/shapes";
-import { drawingActionFromRaw, drawingActionToRaw } from "../../../types/viewer/action";
+import {
+    drawingActionFromRaw,
+    drawingActionToRaw,
+    ShapeCreateAction,
+    ShapeDeleteAction,
+    ShapeEditAction,
+} from "../../../types/viewer/action";
+import type { DrawingAction } from "../../../types/viewer/action";
 
 interface HandshakedMessage extends WebSocketMessage {
-    sessionId: string;
+    roomId: string;
+    authorId: string;
     color: string;
     shapes: Shape[];
+    pastActions: object[];
+    futureActions: object[];
 }
 
 interface PropagateShapeActionMessage extends WebSocketMessage {
-    sessionId: string;
+    roomId: string;
     action: object;
 }
 
 export type CanvaSocketProps = CanvaProps & {
+    roomId: string;
+    authorId?: string | null;
+    authorName?: string;
+    onHandshaked?: (authorId: string, color: string) => void;
 }
 
-const CanvaSocket = forwardRef<CanvaHandle, CanvaSocketProps>(function CanvaSocket(props: CanvaSocketProps, ref) {
+const CanvaSocket = forwardRef<CanvaHandle, CanvaSocketProps>(function CanvaSocket(
+    props: CanvaSocketProps,
+    ref
+) {
+    const { roomId, authorId: initialAuthorId, authorName = "Anonymous", onHandshaked, ...canvaProps } = props;
 
     const handleRef = useRef<CanvaHandle | null>(null);
 
@@ -31,12 +49,23 @@ const CanvaSocket = forwardRef<CanvaHandle, CanvaSocketProps>(function CanvaSock
     const { setOnConnect } = webSocket;
     const webSocketBus = useRef<WebSocketBus>(new WebSocketBus(webSocket));
 
-    const sessionId = useRef<string | null>(null);
+    const roomIdRef = useRef<string>(roomId);
+    const authorIdRef = useRef<string | null>(initialAuthorId ?? null);
     const [_shapes, setShapes] = useState<Shape[]>([]);
 
+    // Pending history to restore after shapes are set
+    const pendingHistoryRef = useRef<{ past: DrawingAction[]; future: DrawingAction[] } | null>(null);
+
     useEffect(() => {
-        if(handleRef.current) 
+        if (handleRef.current) {
             handleRef.current.setShapes(_shapes);
+
+            if (pendingHistoryRef.current) {
+                const { past, future } = pendingHistoryRef.current;
+                pendingHistoryRef.current = null;
+                handleRef.current.restoreHistory(past, future);
+            }
+        }
     }, [_shapes]);
 
     useImperativeHandle(ref, () => ({
@@ -47,6 +76,7 @@ const CanvaSocket = forwardRef<CanvaHandle, CanvaSocketProps>(function CanvaSock
         setShapes: (shapes) => handleRef.current?.setShapes(shapes),
         undo: () => handleRef.current?.undo(),
         redo: () => handleRef.current?.redo(),
+        restoreHistory: (past, future) => handleRef.current?.restoreHistory(past, future),
     }), []);
 
     class BusHandler {
@@ -54,35 +84,45 @@ const CanvaSocket = forwardRef<CanvaHandle, CanvaSocketProps>(function CanvaSock
         @subscribe("handshaked")
         handshaked(_socket: ReturnType<typeof useWebSocket>, rawMessage: object): void {
             const message = rawMessage as HandshakedMessage;
-            sessionId.current = message.sessionId;
+            authorIdRef.current = message.authorId;
+            sessionStorage.setItem(`authorId:${roomIdRef.current}`, message.authorId);
 
             const shapes: Shape[] = Shape.fromRawArray(message.shapes);
-            console.log("Hanshaked shapes:", shapes);
 
+            const past: DrawingAction[] = (message.pastActions ?? []).map(drawingActionFromRaw);
+            const future: DrawingAction[] = (message.futureActions ?? []).map(drawingActionFromRaw);
+
+            pendingHistoryRef.current = { past, future };
             setShapes(shapes);
+
+            onHandshaked?.(message.authorId, message.color);
         }
 
         @subscribe("propagate_shape_action")
         propagateShapeAction(_socket: ReturnType<typeof useWebSocket>, rawMessage: object): void {
             const message = rawMessage as PropagateShapeActionMessage;
             const action = drawingActionFromRaw(message.action);
-
             handleRef.current?.applyAction(action);
         }
 
     }
 
-    useEffect(() => {    
+    useEffect(() => {
+        roomIdRef.current = roomId;
+    }, [roomId]);
+
+    useEffect(() => {
 
         const bus = webSocketBus.current;
-        // Prevent duplicate handler registration (e.g. React StrictMode double effects in dev).
         bus.clean();
         bus.register(new BusHandler());
 
         setOnConnect(() => {
             bus.publish({
                 type: "handshake",
-                sessionId: sessionId.current,
+                roomId: roomIdRef.current,
+                authorId: authorIdRef.current,
+                authorName,
             });
         });
 
@@ -93,22 +133,38 @@ const CanvaSocket = forwardRef<CanvaHandle, CanvaSocketProps>(function CanvaSock
         };
     }, []);
 
+    const handleAction = (action: DrawingAction, source: "action" | "undo" | "redo") => {
+        if (!roomIdRef.current) return;
+
+        webSocketBus.current.publish({
+            type: "shape_action",
+            roomId: roomIdRef.current,
+            action: drawingActionToRaw(action),
+            source,
+        });
+    };
+
+    // Determine inverse actions for undo/redo to send correct source flag
+    const handleUndo = (action: DrawingAction) => {
+        // Called by Canva's onUndoAction with the inverse action.
+        // We tag it as "undo" so the server pops the original from the author's past stack.
+        handleAction(action, "undo");
+    };
+
+    const handleRedo = (action: DrawingAction) => {
+        // Called by Canva's onRedoAction with the re-applied action.
+        // We tag it as "redo" so the server moves it from future back to past.
+        handleAction(action, "redo");
+    };
+
     return (
         <div>
             <Canva
-                {...props}
+                {...canvaProps}
                 ref={handleRef}
-                onAction={(action) => {
-                    if (!sessionId.current) {
-                        return;
-                    }
-
-                    webSocketBus.current.publish({
-                        type: "shape_action",
-                        sessionId: sessionId.current,
-                        action: drawingActionToRaw(action),
-                    });
-                }}
+                onAction={(action) => handleAction(action, "action")}
+                onUndoAction={handleUndo}
+                onRedoAction={handleRedo}
             >
             </Canva>
         </div>

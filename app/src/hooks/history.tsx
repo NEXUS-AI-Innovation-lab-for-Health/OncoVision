@@ -5,6 +5,7 @@ export interface History {
     push(action: DrawingAction): void;
     undo(): DrawingAction | undefined;
     redo(): DrawingAction | undefined;
+    restore(past: DrawingAction[], future: DrawingAction[]): void;
     readonly canUndo: boolean;
     readonly canRedo: boolean;
 }
@@ -34,6 +35,10 @@ export function useHistory(): History {
             if (!action) return undefined;
             past.current.push(action);
             return action;
+        },
+        restore(past_: DrawingAction[], future_: DrawingAction[]) {
+            past.current = [...past_];
+            future.current = [...future_];
         },
         get canUndo() { return past.current.length > 0; },
         get canRedo() { return future.current.length > 0; },
