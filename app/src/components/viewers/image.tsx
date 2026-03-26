@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, type ComponentType } from "react";
+import { useEffect, useRef, useState, useCallback, type ComponentType, type ForwardRefExoticComponent, type RefAttributes } from "react";
 import { useRest } from "../../hooks/rest";
 import Toolbar from "./tool/bar";
 import ImagePreview from "./preview"; // New import
@@ -12,7 +12,7 @@ import type { Shape } from "../../types/viewer/shapes";
 interface ImageViewerProps {
     imageId: string;
     canva?: {
-        type: ComponentType<CanvaProps>;
+        type: ComponentType<CanvaProps> | ForwardRefExoticComponent<CanvaProps & RefAttributes<CanvaHandle>>;
         props?: Partial<CanvaProps>;
     };
 }
@@ -121,7 +121,7 @@ function drawShapeOnCanvas(ctx: CanvasRenderingContext2D, shape: Shape): void {
 export default function ImageViewer(props: ImageViewerProps) {
 
     const { imageId, canva } = props;
-    const CanvaComponent = canva?.type || Canva;
+    const CanvaComponent = (canva?.type || Canva) as ComponentType<any>;
     const canvaProps = canva?.props || {};
 
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -147,6 +147,7 @@ export default function ImageViewer(props: ImageViewerProps) {
     // Capture state
     const [captureDialogOpen, setCaptureDialogOpen] = useState(false);
     const [captureRenderFn, setCaptureRenderFn] = useState<((canvas: HTMLCanvasElement, options?: { showShapes?: boolean }) => Promise<void>) | null>(null);
+    const [captureRect, setCaptureRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
 
     const getFitZoom = useCallback(() => {
         if (!infoRef.current || !containerRef.current) return 0.001;
@@ -330,8 +331,16 @@ export default function ImageViewer(props: ImageViewerProps) {
     const handleCapture = useCallback((data: { rect: { x: number; y: number; width: number; height: number }; shapes: Shape[] }) => {
         const renderFn = buildCaptureRenderer(data.rect, data.shapes);
         setCaptureRenderFn(() => renderFn);
+        setCaptureRect(data.rect);
         setCaptureDialogOpen(true);
     }, [buildCaptureRenderer]);
+
+    const handlePasteSegmentShapes = useCallback((shapes: Shape[]) => {
+        if (!canvaRef.current) return;
+        for (const shape of shapes) {
+            canvaRef.current.addShape(shape);
+        }
+    }, []);
 
     // Main stable drawing function
     const draw = useCallback(() => {
@@ -732,6 +741,8 @@ export default function ImageViewer(props: ImageViewerProps) {
                 open={captureDialogOpen}
                 onClose={() => setCaptureDialogOpen(false)}
                 renderCapture={captureRenderFn}
+                captureRect={captureRect}
+                onPasteShapes={handlePasteSegmentShapes}
             />
         </div>
     );

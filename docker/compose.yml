@@ -57,6 +57,14 @@ services:
       - "27017:27017"
     networks:
       - onco_network
+  segmenter:
+    build:
+      context: ../segmenter
+      dockerfile: Dockerfile
+    container_name: segmenter
+    ports:
+      - "7000:7000"
+    restart: unless-stopped
 
 networks:
   onco_network:

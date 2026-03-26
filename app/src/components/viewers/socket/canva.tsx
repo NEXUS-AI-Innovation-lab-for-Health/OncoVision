@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { CanvaHandle, CanvaProps } from "../canva";
 import Canva from "../canva";
 import { useRest } from "../../../hooks/rest";
@@ -20,7 +20,7 @@ interface PropagateShapeActionMessage extends WebSocketMessage {
 export type CanvaSocketProps = CanvaProps & {
 }
 
-export default function CanvaSocket(props: CanvaSocketProps) {
+const CanvaSocket = forwardRef<CanvaHandle, CanvaSocketProps>(function CanvaSocket(props: CanvaSocketProps, ref) {
 
     const handleRef = useRef<CanvaHandle | null>(null);
 
@@ -38,6 +38,16 @@ export default function CanvaSocket(props: CanvaSocketProps) {
         if(handleRef.current) 
             handleRef.current.setShapes(_shapes);
     }, [_shapes]);
+
+    useImperativeHandle(ref, () => ({
+        addShape: (shape) => handleRef.current?.addShape(shape),
+        removeShape: (shape) => handleRef.current?.removeShape(shape),
+        applyAction: (action) => handleRef.current?.applyAction(action),
+        setListener: (listener) => handleRef.current?.setListener(listener),
+        setShapes: (shapes) => handleRef.current?.setShapes(shapes),
+        undo: () => handleRef.current?.undo(),
+        redo: () => handleRef.current?.redo(),
+    }), []);
 
     class BusHandler {
 
@@ -103,4 +113,6 @@ export default function CanvaSocket(props: CanvaSocketProps) {
             </Canva>
         </div>
     );
-}
+});
+
+export default CanvaSocket;

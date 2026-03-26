@@ -6,6 +6,7 @@ from uuid import uuid4
 from io import BytesIO
 import math
 import threading
+import tempfile
 
 from PIL import Image
 from openslide.lowlevel import OpenSlideUnsupportedFormatError
@@ -53,6 +54,10 @@ class ImageRegistry:
             self.fs.mkdir(bucket_path)
 
         self.collection = mongo_connection.get_database()[bucket]
+
+        # Dedicated temp directory for local source/tile cache (cross-platform)
+        self._temp_dir = Path(tempfile.gettempdir()) / "oncovision"
+        self._temp_dir.mkdir(parents=True, exist_ok=True)
 
         # Per-image lock to prevent concurrent source downloads
         self._source_locks: dict[str, threading.Lock] = {}
@@ -222,8 +227,8 @@ class ImageRegistry:
 
     def _ensure_source_local(self, record: ImageRecord) -> Path:
         source_suffix = Path(record.source_key).suffix
-        local_path = Path(f"/tmp/{record.id}{source_suffix}")
-        local_tiles_dir = Path(f"/tmp/{record.id}_files")
+        local_path = self._temp_dir / f"{record.id}{source_suffix}"
+        local_tiles_dir = self._temp_dir / f"{record.id}_files"
 
         # Fast-path: already fully downloaded
         if local_path.exists():
