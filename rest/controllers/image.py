@@ -5,6 +5,7 @@ from uuid import uuid4
 import time
 import shutil
 import zipfile
+import tempfile
 
 from fastapi import UploadFile, File, Form, HTTPException
 from fastapi.responses import Response
@@ -48,6 +49,7 @@ class ImageController(Controller):
         kind: ImageFormat | None = Form(default=None),
     ):
         filename = file.filename or "upload"
+        safe_filename = Path(filename).name or "upload"
 
         if kind is None:
             detected = detect_format_from_path(Path(filename))
@@ -58,8 +60,10 @@ class ImageController(Controller):
                 raise HTTPException(status_code=400, detail="Could not detect image format from filename. Please specify 'kind' explicitly.")
             kind = detected
 
-        # Save temporarily to process
-        temp_path = Path(f"/tmp/{uuid4().hex}_{filename}")
+        # Save temporarily to process (cross-platform temp directory)
+        temp_root = Path(tempfile.gettempdir())
+        temp_root.mkdir(parents=True, exist_ok=True)
+        temp_path = temp_root / f"{uuid4().hex}_{safe_filename}"
         content = await file.read()
         temp_path.write_bytes(content)
         extracted_dir: Path | None = None
@@ -69,7 +73,7 @@ class ImageController(Controller):
             if kind == "DEEPZOOM":
                 suffix = temp_path.suffix.lower()
                 if suffix == ".zip":
-                    extracted_dir = Path(f"/tmp/{uuid4().hex}_dzi")
+                    extracted_dir = temp_root / f"{uuid4().hex}_dzi"
                     extracted_dir.mkdir(parents=True, exist_ok=True)
                     with zipfile.ZipFile(temp_path, "r") as zf:
                         zf.extractall(extracted_dir)

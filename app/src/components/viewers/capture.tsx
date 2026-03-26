@@ -56,7 +56,6 @@ export default function CaptureDialog({
         const baseUrl = (envBaseUrl || "http://localhost:7000").replace(/\/$/, "");
         const endpoint = `${baseUrl}/segment/points?model=brightfield_nuclei&target=nuclei&mode=polygon`;
 
-        // 1) API GET (comportement demandé)
         const getResponse = await fetch(endpoint, { method: "GET" });
         if (getResponse.ok) {
             const getData = await getResponse.json();
@@ -66,7 +65,6 @@ export default function CaptureDialog({
             throw new Error("Réponse GET invalide.");
         }
 
-        // 2) Fallback API POST (compatible avec le serveur FastAPI partagé)
         const blob = await canvasToBlob(canvas);
         const formData = new FormData();
         formData.append("file", blob, "capture.png");
