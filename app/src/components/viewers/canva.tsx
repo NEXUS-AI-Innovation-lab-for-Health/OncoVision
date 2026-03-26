@@ -727,7 +727,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
             restoreHistory,
         };
         return handle;
-    }, [addShape, removeShape, applyAction, setListener, setShapesExternal, undo, redo, restoreHistory]);
+    }, [addShape, removeShape, applyAction, setListener, setShapesExternal, undo, redo]);
 
     const toImagePoint = (e: React.PointerEvent<SVGSVGElement>): Point => {
         const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();

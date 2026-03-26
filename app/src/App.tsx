@@ -31,11 +31,13 @@ export default function App() {
 					{!currentRoom ? (
 						<RoomSelector onJoinRoom={handleJoinRoom} />
 					) : (
-						<ImageUploader
-							room={currentRoom}
-							author={currentAuthor!}
-							onLeaveRoom={handleLeaveRoom}
-						/>
+						<div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+							<ImageUploader
+								room={currentRoom}
+								author={currentAuthor!}
+								onLeaveRoom={handleLeaveRoom}
+							/>
+						</div>
 					)}
 				</RestProvider>
 			</CookiesProvider>

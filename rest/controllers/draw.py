@@ -30,13 +30,15 @@ class DrawAuthor:
 class DrawSession:
     room_id: str
     room_name: str
+    image_id: str
     authors: dict[WebSocket, DrawAuthor]
     known_authors: dict[str, DrawAuthor]
     shapes: list[ShapeUnion]
 
-    def __init__(self, room_id: str, room_name: str):
+    def __init__(self, room_id: str, room_name: str, image_id: str):
         self.room_id = room_id
         self.room_name = room_name
+        self.image_id = image_id
         self.authors = {}
         self.known_authors = {}
         self.shapes = []
@@ -45,7 +47,7 @@ class DrawSession:
         shapes = []
         for shape in self.shapes:
             doc = shape.model_dump()
-            # Pydantic returns UUID objects; convert to str for MongoDB storage.
+            # id may be a uuid.UUID object; convert to str for MongoDB storage.
             if isinstance(doc.get("id"), (bytes,)):
                 doc["id"] = str(doc["id"])
             elif doc.get("id") is not None:
@@ -55,6 +57,7 @@ class DrawSession:
         return {
             "room_id": self.room_id,
             "room_name": self.room_name,
+            "image_id": self.image_id,
             "known_authors": {
                 aid: {"author_id": a.author_id, "name": a.name, "color": a.color}
                 for aid, a in self.known_authors.items()
@@ -66,12 +69,14 @@ class DrawSession:
 class RoomInfo(CamelModel):
     room_id: str
     room_name: str
+    image_id: str
     participant_count: int
     participants: list[dict] = []
 
 
 class CreateRoomRequest(CamelModel):
     name: str
+    image_id: str
 
 
 class HandshakeMessage(WebSocketMessage, type="handshake"):
@@ -148,6 +153,7 @@ class DrawController(Controller, WebSocketHandler):
             result.append(RoomInfo(
                 room_id=session.room_id,
                 room_name=session.room_name,
+                image_id=session.image_id,
                 participant_count=len(session.authors),
                 participants=[
                     {"authorId": a.author_id, "name": a.name, "color": a.color}
@@ -158,11 +164,12 @@ class DrawController(Controller, WebSocketHandler):
 
     def create_room(self, request: CreateRoomRequest) -> RoomInfo:
         room_id = str(uuid.uuid4())
-        session = DrawSession(room_id=room_id, room_name=request.name)
+        session = DrawSession(room_id=room_id, room_name=request.name, image_id=request.image_id)
         self.sessions[room_id] = session
         return RoomInfo(
             room_id=room_id,
             room_name=request.name,
+            image_id=request.image_id,
             participant_count=0,
             participants=[],
         )
@@ -174,6 +181,7 @@ class DrawController(Controller, WebSocketHandler):
         return RoomInfo(
             room_id=session.room_id,
             room_name=session.room_name,
+            image_id=session.image_id,
             participant_count=len(session.authors),
             participants=[
                 {"authorId": a.author_id, "name": a.name, "color": a.color}
