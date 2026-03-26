@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Architecture simple - SAE</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background: #f5f7fb;
+      color: #1f2937;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: #fff;
+      border: 1px solid #d1d5db;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.5rem;
+    }
+
+    p {
+      margin: 0 0 14px;
+      color: #4b5563;
+    }
+
+    .legend {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .legend span {
+      border: 1px solid #d1d5db;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .frontend { background: #dbeafe; }
+    .backend { background: #dcfce7; }
+    .ai { background: #fee2e2; }
+    .data { background: #fef3c7; }
+    .infra { background: #ede9fe; }
+
+    .mermaid {
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      padding: 8px;
+      background: #fafcff;
+      overflow-x: auto;
+    }
+  </style>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "base",
+      flowchart: { curve: "linear" }
+    });
+  </script>
+</head>
+<body>
+  <main class="container">
+    <h1>Architecture simple du projet</h1>
+    <p>Vue globale similaire a un schema d'architecture classique.</p>
+
+    <div class="legend">
+      <span class="frontend">Frontend</span>
+      <span class="backend">Backend</span>
+      <span class="ai">Service IA</span>
+      <span class="data">Data</span>
+      <span class="infra">Infra Docker</span>
+    </div>
+
+    <div class="mermaid">
+flowchart LR
+  U[Utilisateur] --> FE[Frontend React + Vite]
+
+  FE -->|HTTP REST| API[Backend FastAPI]
+  FE <-->|WebSocket| WS[Draw WebSocket]
+  FE -->|HTTP| SEG[Service IA Segmenter]
+
+  API --> REG[Registry tuiles]
+  REG --> MINIO[MinIO]
+  API --> MONGO[MongoDB]
+  WS --> MONGO
+
+  FE -.deploy.-> C1[web :5173]
+  API -.deploy.-> C2[rest :8000]
+  SEG -.deploy.-> C3[segmenter :7000]
+  MINIO -.deploy.-> C4[minio :9000/9001]
+  MONGO -.deploy.-> C5[mongo :27017]
+
+  classDef frontend fill:#dbeafe,stroke:#2563eb,color:#1e3a8a;
+  classDef backend fill:#dcfce7,stroke:#15803d,color:#14532d;
+  classDef ai fill:#fee2e2,stroke:#b91c1c,color:#7f1d1d;
+  classDef data fill:#fef3c7,stroke:#ca8a04,color:#713f12;
+  classDef infra fill:#ede9fe,stroke:#7c3aed,color:#4c1d95;
+
+  class FE frontend;
+  class API,WS,REG backend;
+  class SEG ai;
+   class MINIO,MONGO data;
+  class C1,C2,C3,C4,C5 infra;
+    </div>
+  </main>
+</body>
+</html>

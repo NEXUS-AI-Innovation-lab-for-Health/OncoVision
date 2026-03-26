@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Architecture du projet - version simple</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background: #f5f7fb;
+      color: #1f2937;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: #fff;
+      border: 1px solid #d1d5db;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.5rem;
+    }
+
+    h2 {
+      margin: 18px 0 10px;
+      font-size: 1.05rem;
+      color: #111827;
+    }
+
+    p {
+      margin: 0 0 14px;
+      color: #4b5563;
+    }
+
+    .legend {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .legend span {
+      border: 1px solid #d1d5db;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .app { background: #dbeafe; }
+    .service { background: #dcfce7; }
+    .ai { background: #fee2e2; }
+    .stockage { background: #fef3c7; }
+
+    .mermaid {
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      padding: 8px;
+      background: #fafcff;
+      overflow-x: auto;
+    }
+
+    ul {
+      margin: 8px 0 0;
+      padding-left: 18px;
+      color: #374151;
+      line-height: 1.5;
+    }
+  </style>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "base",
+      flowchart: { curve: "linear" }
+    });
+  </script>
+</head>
+<body>
+  <main class="container">
+    <h1>Comment fonctionne le projet (version simple)</h1>
+    <p>
+      Ce schema montre le parcours d'une demande utilisateur, sans details techniques.
+      L'idee: une application unique devant vous, puis des services en coulisses.
+    </p>
+
+    <div class="legend">
+      <span class="app">Application visible</span>
+      <span class="service">Services metier</span>
+      <span class="ai">Service IA</span>
+      <span class="stockage">Stockage</span>
+    </div>
+
+    <div class="mermaid">
+flowchart LR
+  U[Vous / Utilisateur] --> APP[Application web]
+
+  APP --> SVC[Service principal]
+  APP --> IA[Assistant IA]
+
+  SVC --> DB[Base de donnees]
+  SVC --> FILES[Stockage des fichiers]
+  IA --> SVC
+
+  classDef app fill:#dbeafe,stroke:#2563eb,color:#1e3a8a;
+  classDef service fill:#dcfce7,stroke:#15803d,color:#14532d;
+  classDef ai fill:#fee2e2,stroke:#b91c1c,color:#7f1d1d;
+  classDef stockage fill:#fef3c7,stroke:#ca8a04,color:#713f12;
+
+  class APP app;
+  class SVC service;
+  class IA ai;
+  class DB,FILES stockage;
+    </div>
+
+    <h2>Lecture rapide</h2>
+    <ul>
+      <li>Vous utilisez une seule application web.</li>
+      <li>L'application envoie les demandes au service principal.</li>
+      <li>Un module IA aide pour les fonctions intelligentes.</li>
+      <li>Les informations sont gardees dans une base de donnees et un espace fichiers.</li>
+    </ul>
+  </main>
+</body>
+</html>
