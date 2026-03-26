@@ -169,7 +169,8 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     const [isDrawing, setIsDrawing] = useState(false);
     const [selectedShapeIds, setSelectedShapeIds] = useState<Set<string>>(new Set());
     const [movingShapeId, setMovingShapeId] = useState<string | null>(null);
-        const [hoveredSelectionShapeId, setHoveredSelectionShapeId] = useState<string | null>(null);
+    const [hoveredSelectionShapeId, setHoveredSelectionShapeId] = useState<string | null>(null);
+    const [focusedSelectionShapeId, setFocusedSelectionShapeId] = useState<string | null>(null);
     const moveStartRef = useRef<{ shapeId: string; pointerId: number; startPoint: Point; original: Shape; svg: SVGSVGElement } | null>(null);
 
     const history = useHistory();
@@ -189,6 +190,17 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         anchor: Point;
     }>(null); // used below for highlighting and connection line
     const listenerRef = useRef<((shape: Shape, shapes: Shape[]) => void) | null>(null);
+
+    useEffect(() => {
+        if (selectedShapeIds.size < 2) {
+            if (focusedSelectionShapeId !== null) setFocusedSelectionShapeId(null);
+            return;
+        }
+
+        if (focusedSelectionShapeId && !selectedShapeIds.has(focusedSelectionShapeId)) {
+            setFocusedSelectionShapeId(null);
+        }
+    }, [selectedShapeIds, focusedSelectionShapeId]);
 
     const bounds: CursorBoundingBox | undefined = (imageWidth && imageHeight) ? { width: imageWidth, height: imageHeight } : undefined;
 
@@ -1045,9 +1057,10 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     const renderShapeDetails = (shape: Shape, idx: number) => {
         const isSelected = selectedShapeIds.has(shape.getId() as string);
         const shapeId = shape.getId() as string;
+        const isFocusedFromSelectionPanel = focusedSelectionShapeId === shapeId;
         const isMoving = movingShapeId === shapeId;
         // Skip individual detail card when shape belongs to a multi-selection (handled by SelectionPanel)
-        if (isSelected && selectedShapeIds.size > 1) return null;
+        if (isSelected && selectedShapeIds.size > 1 && !isFocusedFromSelectionPanel) return null;
         if (!properties.shape.details && !isSelected) return null;
 
         const details = shape.details(properties, { imageWidth, imageHeight });
@@ -1069,8 +1082,44 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
 
         const boxW = SHAPE_DETAIL_BOX_WIDTH;
         const boxH = getShapeDetailBoxHeight(detailEntries.length);
+        let lx: number;
+        let ly: number;
 
-        const { x: lx, y: ly } = chooseBestOverlayPosition(anchor, boxW, boxH, visible);
+        if (isFocusedFromSelectionPanel && selectedShapeIds.size > 1) {
+            const selectedShapes = shapes.filter((s) => selectedShapeIds.has(s.getId() as string));
+
+            let mnX = Infinity, mxX = -Infinity, mnY = Infinity;
+            for (const selectedShape of selectedShapes) {
+                const bb = getShapeBBox(selectedShape);
+                if (!bb) continue;
+                mnX = Math.min(mnX, bb.minX);
+                mxX = Math.max(mxX, bb.maxX);
+                mnY = Math.min(mnY, bb.minY);
+            }
+
+            if (isFinite(mnX)) {
+                const panelH = getSelectionPanelHeight(selectedShapes.length);
+                const panelPos = chooseBestOverlayPosition({ x: mxX, y: mnY }, SELECTION_PANEL_WIDTH, panelH, visible);
+                const gap = 8 / viewState.zoom;
+                const maxY = visible.maxY - boxH - 4 / viewState.zoom;
+                const minY = visible.minY + 4 / viewState.zoom;
+                lx = panelPos.x + SELECTION_PANEL_WIDTH + gap;
+                ly = Math.max(minY, Math.min(maxY, panelPos.y));
+
+                const maxX = visible.maxX - boxW - 4 / viewState.zoom;
+                if (lx > maxX) {
+                    lx = panelPos.x - boxW - gap;
+                }
+            } else {
+                const pos = chooseBestOverlayPosition(anchor, boxW, boxH, visible);
+                lx = pos.x;
+                ly = pos.y;
+            }
+        } else {
+            const pos = chooseBestOverlayPosition(anchor, boxW, boxH, visible);
+            lx = pos.x;
+            ly = pos.y;
+        }
 
         if (isDrawing) {
             const margin = 12 / viewState.zoom;
@@ -1154,8 +1203,13 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                 y={ly}
                 isMoving={movingShapeId === "__group__"}
                 hoveredId={hoveredSelectionShapeId}
+                activeId={focusedSelectionShapeId}
                 onRowHoverStart={(id) => setHoveredSelectionShapeId(id)}
                 onRowHoverEnd={() => setHoveredSelectionShapeId(null)}
+                onRowSelect={(id) => {
+                    setFocusedSelectionShapeId(id);
+                    setHoveredSelectionShapeId(id);
+                }}
                 onMovePointerDown={(e) => {
                     e.stopPropagation();
                     startGroupMove(selectedShapes, e);

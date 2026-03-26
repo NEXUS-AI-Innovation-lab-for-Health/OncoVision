@@ -19,8 +19,10 @@ interface SelectionPanelProps {
     y: number;
     isMoving: boolean;
     hoveredId: string | null;
+    activeId: string | null;
     onRowHoverStart: (id: string) => void;
     onRowHoverEnd: () => void;
+    onRowSelect: (id: string) => void;
     onMovePointerDown: (e: ReactPointerEvent<SVGGElement>) => void;
     onMovePointerUp: (e: ReactPointerEvent<SVGGElement>) => void;
     onDeletePointerDown: (e: ReactPointerEvent<SVGGElement>) => void;
@@ -32,8 +34,10 @@ export function SelectionPanel({
     y,
     isMoving,
     hoveredId,
+    activeId,
     onRowHoverStart,
     onRowHoverEnd,
+    onRowSelect,
     onMovePointerDown,
     onMovePointerUp,
     onDeletePointerDown,
@@ -113,29 +117,36 @@ export function SelectionPanel({
             {shapes.map((s, i) => {
                 const ry = y + PANEL_PAD + PANEL_HEADER_H + i * PANEL_ROW_H;
                 const isHovered = hoveredId === s.id;
+                const isActive = activeId === s.id;
                 return (
                     <g
                         key={s.id}
+                        onPointerDown={(e) => {
+                            e.stopPropagation();
+                            onRowSelect(s.id);
+                        }}
                         onPointerEnter={() => onRowHoverStart(s.id)}
                         onPointerLeave={onRowHoverEnd}
+                        style={{ cursor: "pointer" }}
                     >
-                        {isHovered && (
+                        {(isHovered || isActive) && (
                             <rect
                                 x={x + 2} y={ry + 1}
                                 width={PANEL_W - 4} height={PANEL_ROW_H - 2}
-                                fill="rgba(64,158,255,0.15)" rx={3}
+                                fill={isActive ? "rgba(64,158,255,0.24)" : "rgba(64,158,255,0.15)"}
+                                rx={3}
                             />
                         )}
                         {/* Colored dot */}
                         <circle
                             cx={x + PANEL_PAD + 4} cy={ry + PANEL_ROW_H / 2}
                             r={3}
-                            fill={isHovered ? "#409EFF" : "rgba(255,255,255,0.25)"}
+                            fill={isHovered || isActive ? "#409EFF" : "rgba(255,255,255,0.25)"}
                         />
                         <text
                             x={x + PANEL_PAD + 12} y={ry + PANEL_ROW_H / 2 + 3.5}
                             fontSize={9} fontFamily="system-ui, sans-serif"
-                            fill={isHovered ? "#409EFF" : "rgba(255,255,255,0.75)"}
+                            fill={isHovered || isActive ? "#409EFF" : "rgba(255,255,255,0.75)"}
                             style={{ userSelect: "none" }}
                         >
                             {s.type.charAt(0).toUpperCase() + s.type.slice(1)}
