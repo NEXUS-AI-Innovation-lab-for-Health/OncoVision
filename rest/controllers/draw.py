@@ -9,7 +9,7 @@ from api.controller import Controller
 from api.model import CamelModel
 from api.websocket import WebSocketHandler, WebSocketMessage, websocket_subscribe
 from database.mongo.connection import MongoConnection
-from models.form import Bordered, ShapeUnion
+from models.form import ShapeUnion
 
 
 class DrawAuthor:
@@ -195,14 +195,6 @@ class DrawController(Controller, WebSocketHandler):
             ],
         )
 
-    @staticmethod
-    def _normalize_action(author: DrawAuthor | None, action: DrawingActionUnion) -> DrawingActionUnion:
-        if isinstance(action, ShapeCreateAction) and author:
-            for shape in action.shapes:
-                if isinstance(shape, Bordered):
-                    shape.border_color = author.color
-        return action
-
     def _apply_action(self, session: DrawSession, action: DrawingActionUnion) -> None:
         if isinstance(action, ShapeCreateAction):
             session.shapes.extend(action.shapes)
@@ -273,7 +265,7 @@ class DrawController(Controller, WebSocketHandler):
         if not author:
             return
 
-        action = self._normalize_action(author, message.action)
+        action = message.action
         self._apply_action(session, action)
         self._update_author_history(author, message.action, message.source)
 
