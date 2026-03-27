@@ -25,6 +25,49 @@ interface CaptureDialogProps {
     onPasteShapes?: (shapes: Shape[]) => void;
 }
 
+const FALLBACK_SEGMENT_COLORS = [
+    "#22c55e",
+    "#3b82f6",
+    "#f59e0b",
+    "#ef4444",
+    "#14b8a6",
+    "#8b5cf6",
+    "#eab308",
+    "#06b6d4",
+];
+
+function normalizeSegmentationColor(value: unknown): string | null {
+    if (typeof value === "string") {
+        const color = value.trim();
+        return color.length > 0 ? color : null;
+    }
+
+    if (Array.isArray(value) && value.length >= 3) {
+        const [r, g, b] = value;
+        const values = [r, g, b].map((v) => Number(v));
+        if (values.every((v) => Number.isFinite(v))) {
+            const [rr, gg, bb] = values.map((v) => Math.max(0, Math.min(255, Math.round(v))));
+            return `rgb(${rr}, ${gg}, ${bb})`;
+        }
+    }
+
+    return null;
+}
+
+function buildUniqueSegmentColor(index: number, usedColors: Set<string>): string {
+    let candidate = FALLBACK_SEGMENT_COLORS[index % FALLBACK_SEGMENT_COLORS.length];
+    if (!usedColors.has(candidate)) return candidate;
+
+    const hue = Math.round((index * 137.508) % 360);
+    candidate = `hsl(${hue}, 85%, 52%)`;
+    let offset = 17;
+    while (usedColors.has(candidate)) {
+        candidate = `hsl(${(hue + offset) % 360}, 85%, 52%)`;
+        offset += 17;
+    }
+    return candidate;
+}
+
 export default function CaptureDialog({
     open,
     onClose,
@@ -188,9 +231,10 @@ export default function CaptureDialog({
         setSegmenting(true);
         try {
             const data = await requestSegmentation(canvas);
+            const usedColors = new Set<string>();
 
             const polygons: Polygon[] = data
-                .map((item: any) => {
+                .map((item: any, index: number) => {
                     const rawPoints = Array.isArray(item?.points) ? item.points : [];
                     const points = rawPoints
                         .map((p: any) => ({ x: Number(p?.x), y: Number(p?.y) }))
@@ -199,7 +243,12 @@ export default function CaptureDialog({
                     if (points.length < 3) return null;
 
                     const normalized = normalizePolygonPoints(points, canvas.width, canvas.height, captureRect);
-                    const color = typeof item?.color === "string" && item.color.trim() ? item.color : "#00ff88";
+                    const apiColor = normalizeSegmentationColor(item?.color);
+                    const uniqueColor = apiColor && !usedColors.has(apiColor)
+                        ? apiColor
+                        : buildUniqueSegmentColor(index, usedColors);
+                    usedColors.add(uniqueColor);
+                    const color = uniqueColor;
                     return new Polygon(normalized, color, 2);
                 })
                 .filter((shape: Polygon | null): shape is Polygon => shape !== null);

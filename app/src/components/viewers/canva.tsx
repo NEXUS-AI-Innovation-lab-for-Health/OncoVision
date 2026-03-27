@@ -717,7 +717,8 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
 
     useImperativeHandle(ref, () => {
         const handle = {
-            addShape: (shape: Shape) => addShape(shape, true),
+            // External additions (e.g. capture paste) must emit actions for socket propagation.
+            addShape: (shape: Shape) => addShape(shape),
             removeShape,
             applyAction,
             setListener,
