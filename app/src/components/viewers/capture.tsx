@@ -36,18 +36,61 @@ const FALLBACK_SEGMENT_COLORS = [
     "#06b6d4",
 ];
 
+function toHexColor(r: number, g: number, b: number): string {
+    const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+    const hex = (v: number) => clamp(v).toString(16).padStart(2, "0");
+    return `#${hex(r)}${hex(g)}${hex(b)}`;
+}
+
+function hueToHex(hue: number): string {
+    const h = ((hue % 360) + 360) % 360;
+    const c = 1;
+    const x = 1 - Math.abs(((h / 60) % 2) - 1);
+    let r = 0;
+    let g = 0;
+    let b = 0;
+
+    if (h < 60) {
+        r = c; g = x; b = 0;
+    } else if (h < 120) {
+        r = x; g = c; b = 0;
+    } else if (h < 180) {
+        r = 0; g = c; b = x;
+    } else if (h < 240) {
+        r = 0; g = x; b = c;
+    } else if (h < 300) {
+        r = x; g = 0; b = c;
+    } else {
+        r = c; g = 0; b = x;
+    }
+
+    // Keep colors vivid but slightly softened with a small lightness lift.
+    const m = 0.08;
+    return toHexColor((r + m) * 255, (g + m) * 255, (b + m) * 255);
+}
+
 function normalizeSegmentationColor(value: unknown): string | null {
     if (typeof value === "string") {
         const color = value.trim();
-        return color.length > 0 ? color : null;
+        const hexMatch = color.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/);
+        if (!hexMatch) return null;
+
+        const digits = hexMatch[1];
+        if (digits.length === 3) {
+            const r = digits[0];
+            const g = digits[1];
+            const b = digits[2];
+            return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+        }
+
+        return `#${digits.slice(0, 6)}`.toLowerCase();
     }
 
     if (Array.isArray(value) && value.length >= 3) {
         const [r, g, b] = value;
         const values = [r, g, b].map((v) => Number(v));
         if (values.every((v) => Number.isFinite(v))) {
-            const [rr, gg, bb] = values.map((v) => Math.max(0, Math.min(255, Math.round(v))));
-            return `rgb(${rr}, ${gg}, ${bb})`;
+            return toHexColor(values[0], values[1], values[2]);
         }
     }
 
@@ -59,10 +102,10 @@ function buildUniqueSegmentColor(index: number, usedColors: Set<string>): string
     if (!usedColors.has(candidate)) return candidate;
 
     const hue = Math.round((index * 137.508) % 360);
-    candidate = `hsl(${hue}, 85%, 52%)`;
+    candidate = hueToHex(hue);
     let offset = 17;
     while (usedColors.has(candidate)) {
-        candidate = `hsl(${(hue + offset) % 360}, 85%, 52%)`;
+        candidate = hueToHex(hue + offset);
         offset += 17;
     }
     return candidate;
