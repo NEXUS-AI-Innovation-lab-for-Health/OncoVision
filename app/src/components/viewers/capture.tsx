@@ -1,7 +1,7 @@
 import { Modal, Button, Spin, Switch, message } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MdContentCopy, MdDownload } from "react-icons/md";
-import { Polygon } from "../../types/viewer/shapes";
+import { Polygon, UNIFORM_STROKE_WIDTH } from "../../types/viewer/shapes";
 import type { Shape } from "../../types/viewer/shapes";
 import { getEnv } from "../../utils/env";
 
@@ -192,7 +192,7 @@ export default function CaptureDialog({
                 ctx.save();
                 ctx.strokeStyle = shape.borderColor || "#00ff88";
                 ctx.fillStyle = `${shape.borderColor || "#00ff88"}33`;
-                ctx.lineWidth = Math.max(1, shape.borderWidth);
+                ctx.lineWidth = UNIFORM_STROKE_WIDTH;
                 ctx.beginPath();
                 const first = shape.points[0];
                 ctx.moveTo((first.x - captureRect.x) * scaleX, (first.y - captureRect.y) * scaleY);

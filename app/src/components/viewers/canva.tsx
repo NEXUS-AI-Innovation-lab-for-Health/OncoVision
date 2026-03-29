@@ -15,7 +15,7 @@ import {
     CaptureSelectorCursor,
 } from "../../types/viewer/cursors";
 import type { CursorBoundingBox, CursorType } from "../../types/viewer/cursors";
-import { Circle, Ellipse, Line, Polygon, Polyline, Rectangle, Shape } from "../../types/viewer/shapes";
+import { Circle, Ellipse, Line, Polygon, Polyline, Rectangle, Shape, UNIFORM_STROKE_WIDTH } from "../../types/viewer/shapes";
 import type { Point } from "../../types/viewer/shapes";
 import ShapeDetailCard, { SHAPE_DETAIL_BOX_WIDTH, getShapeDetailBoxHeight, SelectionPanel, SELECTION_PANEL_WIDTH, getSelectionPanelHeight } from "./detail";
 
@@ -60,7 +60,7 @@ export const DEFAULT_PROPERTIES: Properties = {
         details: true,
         strike: {
             color: "#ff3b30",
-            width: 2,
+            width: UNIFORM_STROKE_WIDTH,
         },
     },
 };
@@ -204,7 +204,8 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
             return;
         }
 
-        const { color, width: strokeWidth } = properties.shape.strike;
+        const { color } = properties.shape.strike;
+        const strokeWidth = UNIFORM_STROKE_WIDTH;
 
         const createCursor = (tool: CursorType): CanvaCursor => {
             switch (tool) {
@@ -1248,13 +1249,13 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                                 if (hoveredInfo?.idx === idx || hoveredSelectionShapeId === shapeId) {
                                     // override stroke and strokeWidth for highlight
                                     const override: any = { stroke: "#409EFF" };
-                                    const baseWidth = elem.props?.strokeWidth ?? ("borderWidth" in shape ? (shape as any).borderWidth : undefined);
+                                    const baseWidth = elem.props?.strokeWidth ?? UNIFORM_STROKE_WIDTH;
                                     if (typeof baseWidth === "number") override.strokeWidth = baseWidth + 2;
                                     return <g key={`shape-${idx}`}>{React.cloneElement(elem, override)}</g>;
                                 }
                                 if (selectedShapeIds.has(shapeId)) {
                                     const override: any = { stroke: "#22c55e" };
-                                    const baseWidth = elem.props?.strokeWidth ?? ("borderWidth" in shape ? (shape as any).borderWidth : undefined);
+                                    const baseWidth = elem.props?.strokeWidth ?? UNIFORM_STROKE_WIDTH;
                                     if (typeof baseWidth === "number") override.strokeWidth = baseWidth + 1.5;
                                     return <g key={`shape-${idx}`}>{React.cloneElement(elem, override)}</g>;
                                 }

@@ -6,7 +6,7 @@ import Canva from "./canva";
 import CaptureDialog from "./capture";
 import type { CanvaHandle, CanvaTool, CanvaProps, Properties } from "./canva";
 import { DEFAULT_PROPERTIES } from "./canva";
-import { Circle, Ellipse, Line, Polygon, Polyline, Rectangle } from "../../types/viewer/shapes";
+import { Circle, Ellipse, Line, Polygon, Polyline, Rectangle, UNIFORM_STROKE_WIDTH } from "../../types/viewer/shapes";
 import type { Shape } from "../../types/viewer/shapes";
 
 interface ImageViewerProps {
@@ -65,7 +65,7 @@ function drawShapeOnCanvas(ctx: CanvasRenderingContext2D, shape: Shape): void {
     ctx.save();
     if (shape instanceof Line) {
         ctx.strokeStyle = shape.borderColor;
-        ctx.lineWidth = shape.borderWidth;
+        ctx.lineWidth = UNIFORM_STROKE_WIDTH;
         ctx.lineCap = "round";
         ctx.beginPath();
         ctx.moveTo(shape.start.x, shape.start.y);
@@ -73,25 +73,25 @@ function drawShapeOnCanvas(ctx: CanvasRenderingContext2D, shape: Shape): void {
         ctx.stroke();
     } else if (shape instanceof Circle) {
         ctx.strokeStyle = shape.borderColor;
-        ctx.lineWidth = shape.borderWidth;
+        ctx.lineWidth = UNIFORM_STROKE_WIDTH;
         ctx.beginPath();
         ctx.arc(shape.center.x, shape.center.y, shape.radius, 0, Math.PI * 2);
         ctx.stroke();
     } else if (shape instanceof Ellipse) {
         ctx.strokeStyle = shape.borderColor;
-        ctx.lineWidth = shape.borderWidth;
+        ctx.lineWidth = UNIFORM_STROKE_WIDTH;
         ctx.beginPath();
         ctx.ellipse(shape.center.x, shape.center.y, shape.radiusX, shape.radiusY, 0, 0, Math.PI * 2);
         ctx.stroke();
     } else if (shape instanceof Rectangle) {
         ctx.strokeStyle = shape.borderColor;
-        ctx.lineWidth = shape.borderWidth;
+        ctx.lineWidth = UNIFORM_STROKE_WIDTH;
         ctx.beginPath();
         ctx.rect(shape.origin.x, shape.origin.y, shape.width, shape.height);
         ctx.stroke();
     } else if (shape instanceof Polyline) {
         ctx.strokeStyle = shape.borderColor;
-        ctx.lineWidth = shape.borderWidth;
+        ctx.lineWidth = UNIFORM_STROKE_WIDTH;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
         if (shape.points.length >= 2) {
@@ -104,7 +104,7 @@ function drawShapeOnCanvas(ctx: CanvasRenderingContext2D, shape: Shape): void {
         }
     } else if (shape instanceof Polygon) {
         ctx.strokeStyle = shape.borderColor;
-        ctx.lineWidth = shape.borderWidth;
+        ctx.lineWidth = UNIFORM_STROKE_WIDTH;
         ctx.lineJoin = "round";
         if (shape.points.length >= 2) {
             ctx.beginPath();

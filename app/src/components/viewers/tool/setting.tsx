@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent, Dispatch, SetStateAction } from "react";
-import { Slider, InputNumber, Select, Switch } from "antd";
+import { InputNumber, Select, Switch } from "antd";
 import type { CanvaProps, Properties, MeterUnit } from "../canva";
 import { DEFAULT_PROPERTIES } from "../canva";
 
@@ -18,7 +18,6 @@ export default function ToolSettings(props: ToolSettingsProps) {
     const currentUnit: MeterUnit = currentDimension.unit;
     const currentDetails = canva.properties?.shape.details ?? DEFAULT_PROPERTIES.shape.details;
     const [color, setColor] = useState<string>(currentStroke.color);
-    const [width, setWidth] = useState<number>(currentStroke.width);
     const [dimensionWidth, setDimensionWidth] = useState<number>(currentDimension.width);
     const [dimensionHeight, setDimensionHeight] = useState<number>(currentDimension.height);
     const [unit, setUnit] = useState<MeterUnit>(currentUnit);
@@ -27,7 +26,6 @@ export default function ToolSettings(props: ToolSettingsProps) {
     // keep local state in sync when parent changes the properties externally
     useEffect(() => {
         setColor(currentStroke.color);
-        setWidth(currentStroke.width);
     }, [currentStroke]);
 
     useEffect(() => {
@@ -54,14 +52,14 @@ export default function ToolSettings(props: ToolSettingsProps) {
         }));
     };
 
-    const updateStroke = (newColor: string, newWidth: number) => {
+    const updateStroke = (newColor: string) => {
         setProperties((prev) => ({
             ...prev,
             shape: {
                 ...prev.shape,
                 strike: {
                     color: newColor,
-                    width: newWidth,
+                    width: prev.shape.strike.width,
                 },
             },
         }));
@@ -100,13 +98,7 @@ export default function ToolSettings(props: ToolSettingsProps) {
     const onColorChange = (e: ChangeEvent<HTMLInputElement>) => {
         const newColor = e.target.value;
         setColor(newColor);
-        updateStroke(newColor, width);
-    };
-
-    const onWidthChange = (value: number | null) => {
-        if (typeof value !== "number") return;
-        setWidth(value);
-        updateStroke(color, value);
+        updateStroke(newColor);
     };
 
     return (
@@ -167,31 +159,6 @@ export default function ToolSettings(props: ToolSettingsProps) {
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <label>Infos formes</label>
                     <Switch size="small" checked={details} onChange={onDetailsChange} />
-                </div>
-
-                <div>
-                    <label style={{ display: "block", marginBottom: 4 }}>Épaisseur</label>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <Slider
-                            min={1}
-                            max={50}
-                            step={1}
-                            value={width}
-                            onChange={onWidthChange}
-                            tooltip={{ formatter: (v) => `${v}${unit}` }}
-                            style={{ flex: 1 }}
-                        />
-                        <InputNumber
-                            min={1}
-                            max={50}
-                            value={width}
-                            onChange={onWidthChange}
-                            size="small"
-                            formatter={v => `${v}${unit}`}
-                            parser={v => v ? parseFloat(v.replace(unit, "")) : 0}
-                            style={{ width: 64 }}
-                        />
-                    </div>
                 </div>
             </div>
         </div>
