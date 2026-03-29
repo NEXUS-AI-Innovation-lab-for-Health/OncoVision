@@ -1,24 +1,37 @@
-import { Button, Input, Divider } from "antd";
-import { useEffect, useState } from "react";
-import { FaUpload } from "react-icons/fa";
+import { Button, Space, Tag, Typography } from "antd";
+import { useEffect, useRef, useState } from "react";
+import { FaUpload, FaSignOutAlt } from "react-icons/fa";
 import { useRest } from "../../hooks/rest";
 import ImageViewer from "../viewers/image";
 import CanvaSocket from "../viewers/socket/canva";
+import type { RoomInfo, AuthorInfo } from "../room/selector";
 
-export default function ImageUploader() {
+const { Text } = Typography;
+
+interface ImageUploaderProps {
+    room: RoomInfo;
+    author: AuthorInfo;
+    onLeaveRoom: () => void;
+}
+
+export default function ImageUploader({ room, author, onLeaveRoom }: ImageUploaderProps) {
 
     const [file, setFile] = useState<File | null>(null);
-    const [previewId, setPreviewId] = useState<string>("");
     const [responseId, setResponseId] = useState<string>("");
+    const [authorId, setAuthorId] = useState<string | null>(author.authorId);
+    const [authorColor, setAuthorColor] = useState<string>("#888888");
+    const [showUpload, setShowUpload] = useState(false);
+
+    // Ref populated by CanvaSocket so we can trigger a clean leave
+    const canvaSocketLeaveRef = useRef<(() => Promise<void>) | null>(null);
 
     const { useQuery, post } = useRest();
     const { data, refetch } = useQuery<any>({
         queryKey: ["uploadImage"],
         queryFn: async () => {
             const formData = new FormData();
-            if (file) 
+            if (file)
                 formData.append('file', file);
-            console.log("FormData prepared:", formData);
             const response = await post<any>({
                 endpoint: "viewer/images",
                 body: formData,
@@ -35,75 +48,91 @@ export default function ImageUploader() {
     }, [data]);
 
     const upload = async () => {
-        console.log("Uploading file...");
         await refetch();
     };
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = event.target.files?.[0] || null;
         setFile(selectedFile);
-        if (selectedFile) {
-            console.log(`${selectedFile.name} file selected successfully`);
+    };
+
+    const handleHandshaked = (newAuthorId: string, color: string) => {
+        setAuthorId(newAuthorId);
+        setAuthorColor(color);
+        sessionStorage.setItem(`authorId:${room.roomId}`, newAuthorId);
+    };
+
+    const handleLeaveRoom = async () => {
+        // Send leave message (deletes author's shapes on the server and propagates)
+        if (canvaSocketLeaveRef.current) {
+            await canvaSocketLeaveRef.current();
         }
+        // Clear the stored author identity so they get a fresh one if they rejoin
+        sessionStorage.removeItem(`authorId:${room.roomId}`);
+        onLeaveRoom();
     };
 
     return (
-        <div>
-            <input
-                type="file"
-                accept=".tiff,.dcnm,.dcm,.svs,.dzi"
-                onChange={handleFileChange}
-                style={{ display: 'block', marginBottom: 16 }}
-            />
-            {!file ? (
-                <div>
-                    <p className="ant-upload-drag-icon">
-                        <FaUpload />
-                    </p>
-                    <p className="ant-upload-text">Select a file to upload</p>
-                    <p className="ant-upload-hint">
-                        Support for .tiff, .dicom, .svs, .dzi files.
-                    </p>
-                </div>
-            ) : (
-                <div>
-                    <h3>Selected File:</h3>
-                    <p>{file.name}</p>
-                    {responseId && (
-                        <p>Uploaded Image ID: {responseId}</p>
-                    )}
-                </div>
-            )}
-            {file && (
-                <Button
-                    type="primary"
-                    style={{ marginTop: 16 }}
-                    onClick={upload}
-                >
-                    Upload File
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            {/* Room header bar */}
+            <div style={{ padding: '8px 16px', background: '#f0f2f5', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+                <Button danger icon={<FaSignOutAlt />} onClick={handleLeaveRoom} size="small">
+                    Leave Room
                 </Button>
+                <Text strong>{room.roomName}</Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>ID: {room.roomId}</Text>
+                {authorId && (
+                    <Tag color={authorColor} style={{ color: '#fff' }}>
+                        {author.authorName}
+                    </Tag>
+                )}
+                <div style={{ flex: 1 }} />
+                <Button
+                    size="small"
+                    icon={<FaUpload />}
+                    onClick={() => setShowUpload(v => !v)}
+                >
+                    Upload image
+                </Button>
+            </div>
+
+            {/* Collapsible upload panel */}
+            {showUpload && (
+                <div style={{ padding: '12px 16px', background: '#fafafa', borderBottom: '1px solid #e8e8e8', flexShrink: 0 }}>
+                    <Space align="center">
+                        <input
+                            type="file"
+                            accept=".tiff,.dcnm,.dcm,.svs,.dzi"
+                            onChange={handleFileChange}
+                        />
+                        {file && (
+                            <Button type="primary" size="small" onClick={upload}>
+                                Upload
+                            </Button>
+                        )}
+                        {responseId && (
+                            <Text type="success" style={{ fontSize: 12 }}>
+                                Uploaded: {responseId}
+                            </Text>
+                        )}
+                    </Space>
+                </div>
             )}
 
-            <Divider />
-
-            <div style={{ marginTop: '20px' }}>
-                <h3>Aperçu Image Serveur</h3>
-                <div style={{ marginBottom: '10px' }}>
-                    <Input 
-                        placeholder="ID de l'image" 
-                        value={previewId} 
-                        onChange={(e) => setPreviewId(e.target.value)}
-                        style={{ width: '300px' }}
-                    />
-                </div>
-                {previewId && (
-                    <div style={{ width: '100%', height: '600px', border: '1px solid #333' }}>
-                        <ImageViewer imageId={previewId} canva={{
-                            type: CanvaSocket
-                        }} />
-                    </div>
-                )}
+            {/* Image viewer fills remaining space */}
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+                <ImageViewer imageId={room.imageId} canva={{
+                    type: CanvaSocket,
+                    props: {
+                        roomId: room.roomId,
+                        authorId,
+                        authorName: author.authorName,
+                        onHandshaked: handleHandshaked,
+                        leaveRef: canvaSocketLeaveRef,
+                    },
+                }} />
             </div>
         </div>
     );
 }
+

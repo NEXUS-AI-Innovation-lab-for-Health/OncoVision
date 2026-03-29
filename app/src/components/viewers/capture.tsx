@@ -1,7 +1,7 @@
 import { Modal, Button, Spin, Switch, message } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MdContentCopy, MdDownload } from "react-icons/md";
-import { Polygon } from "../../types/viewer/shapes";
+import { Polygon, UNIFORM_STROKE_WIDTH } from "../../types/viewer/shapes";
 import type { Shape } from "../../types/viewer/shapes";
 import { getEnv } from "../../utils/env";
 
@@ -23,6 +23,92 @@ interface CaptureDialogProps {
     renderCapture: ((canvas: HTMLCanvasElement, options?: { showShapes?: boolean }) => Promise<void>) | null;
     captureRect?: CaptureRect | null;
     onPasteShapes?: (shapes: Shape[]) => void;
+}
+
+const FALLBACK_SEGMENT_COLORS = [
+    "#22c55e",
+    "#3b82f6",
+    "#f59e0b",
+    "#ef4444",
+    "#14b8a6",
+    "#8b5cf6",
+    "#eab308",
+    "#06b6d4",
+];
+
+function toHexColor(r: number, g: number, b: number): string {
+    const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+    const hex = (v: number) => clamp(v).toString(16).padStart(2, "0");
+    return `#${hex(r)}${hex(g)}${hex(b)}`;
+}
+
+function hueToHex(hue: number): string {
+    const h = ((hue % 360) + 360) % 360;
+    const c = 1;
+    const x = 1 - Math.abs(((h / 60) % 2) - 1);
+    let r = 0;
+    let g = 0;
+    let b = 0;
+
+    if (h < 60) {
+        r = c; g = x; b = 0;
+    } else if (h < 120) {
+        r = x; g = c; b = 0;
+    } else if (h < 180) {
+        r = 0; g = c; b = x;
+    } else if (h < 240) {
+        r = 0; g = x; b = c;
+    } else if (h < 300) {
+        r = x; g = 0; b = c;
+    } else {
+        r = c; g = 0; b = x;
+    }
+
+    // Keep colors vivid but slightly softened with a small lightness lift.
+    const m = 0.08;
+    return toHexColor((r + m) * 255, (g + m) * 255, (b + m) * 255);
+}
+
+function normalizeSegmentationColor(value: unknown): string | null {
+    if (typeof value === "string") {
+        const color = value.trim();
+        const hexMatch = color.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/);
+        if (!hexMatch) return null;
+
+        const digits = hexMatch[1];
+        if (digits.length === 3) {
+            const r = digits[0];
+            const g = digits[1];
+            const b = digits[2];
+            return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+        }
+
+        return `#${digits.slice(0, 6)}`.toLowerCase();
+    }
+
+    if (Array.isArray(value) && value.length >= 3) {
+        const [r, g, b] = value;
+        const values = [r, g, b].map((v) => Number(v));
+        if (values.every((v) => Number.isFinite(v))) {
+            return toHexColor(values[0], values[1], values[2]);
+        }
+    }
+
+    return null;
+}
+
+function buildUniqueSegmentColor(index: number, usedColors: Set<string>): string {
+    let candidate = FALLBACK_SEGMENT_COLORS[index % FALLBACK_SEGMENT_COLORS.length];
+    if (!usedColors.has(candidate)) return candidate;
+
+    const hue = Math.round((index * 137.508) % 360);
+    candidate = hueToHex(hue);
+    let offset = 17;
+    while (usedColors.has(candidate)) {
+        candidate = hueToHex(hue + offset);
+        offset += 17;
+    }
+    return candidate;
 }
 
 export default function CaptureDialog({
@@ -106,7 +192,7 @@ export default function CaptureDialog({
                 ctx.save();
                 ctx.strokeStyle = shape.borderColor || "#00ff88";
                 ctx.fillStyle = `${shape.borderColor || "#00ff88"}33`;
-                ctx.lineWidth = Math.max(1, shape.borderWidth);
+                ctx.lineWidth = UNIFORM_STROKE_WIDTH;
                 ctx.beginPath();
                 const first = shape.points[0];
                 ctx.moveTo((first.x - captureRect.x) * scaleX, (first.y - captureRect.y) * scaleY);
@@ -188,9 +274,10 @@ export default function CaptureDialog({
         setSegmenting(true);
         try {
             const data = await requestSegmentation(canvas);
+            const usedColors = new Set<string>();
 
             const polygons: Polygon[] = data
-                .map((item: any) => {
+                .map((item: any, index: number) => {
                     const rawPoints = Array.isArray(item?.points) ? item.points : [];
                     const points = rawPoints
                         .map((p: any) => ({ x: Number(p?.x), y: Number(p?.y) }))
@@ -199,7 +286,12 @@ export default function CaptureDialog({
                     if (points.length < 3) return null;
 
                     const normalized = normalizePolygonPoints(points, canvas.width, canvas.height, captureRect);
-                    const color = typeof item?.color === "string" && item.color.trim() ? item.color : "#00ff88";
+                    const apiColor = normalizeSegmentationColor(item?.color);
+                    const uniqueColor = apiColor && !usedColors.has(apiColor)
+                        ? apiColor
+                        : buildUniqueSegmentColor(index, usedColors);
+                    usedColors.add(uniqueColor);
+                    const color = uniqueColor;
                     return new Polygon(normalized, color, 2);
                 })
                 .filter((shape: Polygon | null): shape is Polygon => shape !== null);

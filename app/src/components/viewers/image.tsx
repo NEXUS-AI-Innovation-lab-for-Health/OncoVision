@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, type ComponentType, type ForwardRefExoticComponent, type RefAttributes } from "react";
+import { useEffect, useRef, useState, useCallback, type ComponentType, type ForwardRefExoticComponent } from "react";
 import { useRest } from "../../hooks/rest";
 import Toolbar from "./tool/bar";
 import ImagePreview from "./preview"; // New import
@@ -6,14 +6,15 @@ import Canva from "./canva";
 import CaptureDialog from "./capture";
 import type { CanvaHandle, CanvaTool, CanvaProps, Properties } from "./canva";
 import { DEFAULT_PROPERTIES } from "./canva";
-import { Circle, Ellipse, Line, Polygon, Polyline, Rectangle } from "../../types/viewer/shapes";
+import { Circle, Ellipse, Line, Polygon, Polyline, Rectangle, UNIFORM_STROKE_WIDTH } from "../../types/viewer/shapes";
 import type { Shape } from "../../types/viewer/shapes";
 
 interface ImageViewerProps {
     imageId: string;
     canva?: {
-        type: ComponentType<CanvaProps> | ForwardRefExoticComponent<CanvaProps & RefAttributes<CanvaHandle>>;
-        props?: Partial<CanvaProps>;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        type: ComponentType<any> | ForwardRefExoticComponent<any>;
+        props?: Partial<CanvaProps> & Record<string, unknown>;
     };
 }
 
@@ -64,7 +65,7 @@ function drawShapeOnCanvas(ctx: CanvasRenderingContext2D, shape: Shape): void {
     ctx.save();
     if (shape instanceof Line) {
         ctx.strokeStyle = shape.borderColor;
-        ctx.lineWidth = shape.borderWidth;
+        ctx.lineWidth = UNIFORM_STROKE_WIDTH;
         ctx.lineCap = "round";
         ctx.beginPath();
         ctx.moveTo(shape.start.x, shape.start.y);
@@ -72,25 +73,25 @@ function drawShapeOnCanvas(ctx: CanvasRenderingContext2D, shape: Shape): void {
         ctx.stroke();
     } else if (shape instanceof Circle) {
         ctx.strokeStyle = shape.borderColor;
-        ctx.lineWidth = shape.borderWidth;
+        ctx.lineWidth = UNIFORM_STROKE_WIDTH;
         ctx.beginPath();
         ctx.arc(shape.center.x, shape.center.y, shape.radius, 0, Math.PI * 2);
         ctx.stroke();
     } else if (shape instanceof Ellipse) {
         ctx.strokeStyle = shape.borderColor;
-        ctx.lineWidth = shape.borderWidth;
+        ctx.lineWidth = UNIFORM_STROKE_WIDTH;
         ctx.beginPath();
         ctx.ellipse(shape.center.x, shape.center.y, shape.radiusX, shape.radiusY, 0, 0, Math.PI * 2);
         ctx.stroke();
     } else if (shape instanceof Rectangle) {
         ctx.strokeStyle = shape.borderColor;
-        ctx.lineWidth = shape.borderWidth;
+        ctx.lineWidth = UNIFORM_STROKE_WIDTH;
         ctx.beginPath();
         ctx.rect(shape.origin.x, shape.origin.y, shape.width, shape.height);
         ctx.stroke();
     } else if (shape instanceof Polyline) {
         ctx.strokeStyle = shape.borderColor;
-        ctx.lineWidth = shape.borderWidth;
+        ctx.lineWidth = UNIFORM_STROKE_WIDTH;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
         if (shape.points.length >= 2) {
@@ -103,7 +104,7 @@ function drawShapeOnCanvas(ctx: CanvasRenderingContext2D, shape: Shape): void {
         }
     } else if (shape instanceof Polygon) {
         ctx.strokeStyle = shape.borderColor;
-        ctx.lineWidth = shape.borderWidth;
+        ctx.lineWidth = UNIFORM_STROKE_WIDTH;
         ctx.lineJoin = "round";
         if (shape.points.length >= 2) {
             ctx.beginPath();

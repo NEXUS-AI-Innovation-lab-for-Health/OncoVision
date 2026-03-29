@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import type { UUIDTypes } from "uuid";
 import type { Properties } from "../../components/viewers/canva";
 
+export const UNIFORM_STROKE_WIDTH = 2;
+
 interface DetailContext {
     imageWidth?: number;
     imageHeight?: number;
@@ -120,7 +122,8 @@ export class Line extends Shape implements Bordered {
                 x2={this.end.x}
                 y2={this.end.y}
                 stroke={this.borderColor}
-                strokeWidth={this.borderWidth}
+                strokeWidth={UNIFORM_STROKE_WIDTH}
+                vectorEffect="non-scaling-stroke"
             />
         );
     }
@@ -167,7 +170,8 @@ export class Circle extends Shape implements Bordered {
                 cy={this.center.y}
                 r={this.radius}
                 stroke={this.borderColor}
-                strokeWidth={this.borderWidth}
+                strokeWidth={UNIFORM_STROKE_WIDTH}
+                vectorEffect="non-scaling-stroke"
                 fill="none"
             />
         );
@@ -222,7 +226,8 @@ export class Ellipse extends Shape implements Bordered {
                 rx={this.radiusX}
                 ry={this.radiusY}
                 stroke={this.borderColor}
-                strokeWidth={this.borderWidth}
+                strokeWidth={UNIFORM_STROKE_WIDTH}
+                vectorEffect="non-scaling-stroke"
                 fill="none"
             />
         );
@@ -279,7 +284,8 @@ export class Rectangle extends Shape implements Bordered {
                 width={this.width}
                 height={this.height}
                 stroke={this.borderColor}
-                strokeWidth={this.borderWidth}
+                strokeWidth={UNIFORM_STROKE_WIDTH}
+                vectorEffect="non-scaling-stroke"
                 fill="none"
             />
         );
@@ -327,7 +333,7 @@ export class Polygon extends Shape implements Bordered {
 
     render(): ReactNode {
         const pointsStr = this.points.map((p) => `${p.x},${p.y}`).join(" ");
-        return <polygon points={pointsStr} stroke={this.borderColor} strokeWidth={this.borderWidth} fill="none" />;
+        return <polygon points={pointsStr} stroke={this.borderColor} strokeWidth={UNIFORM_STROKE_WIDTH} vectorEffect="non-scaling-stroke" fill="none" />;
     }
 
     calculateArea(): number {
@@ -379,7 +385,7 @@ export class Polyline extends Shape implements Bordered {
 
     render(): ReactNode {
         const pointsStr = this.points.map((p) => `${p.x},${p.y}`).join(" ");
-        return <polyline points={pointsStr} stroke={this.borderColor} strokeWidth={this.borderWidth} fill="none" />;
+        return <polyline points={pointsStr} stroke={this.borderColor} strokeWidth={UNIFORM_STROKE_WIDTH} vectorEffect="non-scaling-stroke" fill="none" />;
     }
 
     details(properties: Properties, context?: DetailContext): Record<string, {label: ReactNode, value: ReactNode}> {

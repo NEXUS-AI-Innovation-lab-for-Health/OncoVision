@@ -29,6 +29,7 @@ class ImageController(Controller):
         # Pass Mongo connection + DB name so registry persists records
         self.registry = ImageRegistry(s3_connection, bucket, mongo_connection=mongo_connection)
 
+        self.add_api_route("/images", self.list_images, methods=["GET"])
         self.add_api_route("/images", self.upload_image, methods=["POST"])
         self.add_api_route("/images/{image_id}/info", self.get_info, methods=["GET"])
         self.add_api_route("/images/{image_id}.dzi", self.get_dzi, methods=["GET"])
@@ -42,6 +43,19 @@ class ImageController(Controller):
             self.get_tile_png,
             methods=["GET"],
         )
+
+    def list_images(self):
+        docs = list(self.registry.collection.find({}, {"_id": 1, "kind": 1, "width": 1, "height": 1, "levels": 1}))
+        return [
+            {
+                "id": doc["_id"],
+                "kind": doc.get("kind", ""),
+                "width": doc.get("width", 0),
+                "height": doc.get("height", 0),
+                "levels": doc.get("levels", 0),
+            }
+            for doc in docs
+        ]
 
     async def upload_image(
         self,
