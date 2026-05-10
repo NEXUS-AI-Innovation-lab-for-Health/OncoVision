@@ -5,7 +5,7 @@ export interface CursorBoundingBox {
     height: number;
 }
 
-export type CursorType = "pensil" | "line" | "circle" | "ellipse" | "rectangle" | "polygon" | "selector" | "capture";
+export type CursorType = "pensil" | "line" | "circle" | "ellipse" | "rectangle" | "polygon" | "selector" | "capture" | "text";
 
 export abstract class CanvaCursor {
     private readonly type: CursorType;

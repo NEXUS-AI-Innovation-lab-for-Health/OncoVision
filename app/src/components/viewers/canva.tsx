@@ -13,9 +13,10 @@ import {
     RectangleCursor,
     ShapeSelectorCursor,
     CaptureSelectorCursor,
+    TextCursor,
 } from "../../types/viewer/cursors";
 import type { CursorBoundingBox, CursorType } from "../../types/viewer/cursors";
-import { Circle, Ellipse, Line, Polygon, Polyline, Rectangle, Shape, UNIFORM_STROKE_WIDTH } from "../../types/viewer/shapes";
+import { Circle, Ellipse, Line, Polygon, Polyline, Rectangle, Shape, Text, UNIFORM_STROKE_WIDTH } from "../../types/viewer/shapes";
 import type { Point } from "../../types/viewer/shapes";
 import ShapeDetailCard, { SHAPE_DETAIL_BOX_WIDTH, getShapeDetailBoxHeight, SelectionPanel, SELECTION_PANEL_WIDTH, getSelectionPanelHeight } from "./detail";
 
@@ -110,6 +111,8 @@ function computeShapeOffset(current: Shape, original: Shape): { dx: number; dy: 
         return { dx: (current as any).center.x - (original as any).center.x, dy: (current as any).center.y - (original as any).center.y };
     if (current instanceof Rectangle && original instanceof Rectangle)
         return { dx: current.origin.x - original.origin.x, dy: current.origin.y - original.origin.y };
+    if (current instanceof Text && original instanceof Text)
+        return { dx: current.position.x - original.position.x, dy: current.position.y - original.position.y };
     if ((current instanceof Polygon || current instanceof Polyline) && (original instanceof Polygon || original instanceof Polyline)) {
         const cp = (current as any).points as { x: number; y: number }[];
         const op = (original as any).points as { x: number; y: number }[];
@@ -153,6 +156,9 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     const [movingShapeId, setMovingShapeId] = useState<string | null>(null);
     const [hoveredSelectionShapeId, setHoveredSelectionShapeId] = useState<string | null>(null);
     const [focusedSelectionShapeId, setFocusedSelectionShapeId] = useState<string | null>(null);
+    const [textInputPosition, setTextInputPosition] = useState<Point | null>(null);
+    const [textInputValue, setTextInputValue] = useState<string>("");
+    const [textFontSize, setTextFontSize] = useState<number>(32);
     const moveStartRef = useRef<{ shapeId: string; pointerId: number; startPoint: Point; original: Shape; svg: SVGSVGElement } | null>(null);
 
     const history = useHistory();
@@ -225,6 +231,8 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                     return new ShapeSelectorCursor("#4ea1ff", 1.5, getShapeBBox);
                 case "capture":
                     return new CaptureSelectorCursor("#f59e0b", 1.5, getShapeBBox);
+                case "text":
+                    return new TextCursor(color, strokeWidth);
                 default:
                     return new LineCursor(color, strokeWidth);
             }
@@ -311,6 +319,9 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         if (shape instanceof Polyline) {
             return new Polyline(shape.points.map((p) => ({ ...p })), shape.borderColor, shape.borderWidth, shape.getId());
         }
+        if (shape instanceof Text) {
+            return new Text({ ...shape.position }, shape.content, shape.fontSize, shape.fontColor, shape.getId());
+        }
         return shape;
     };
 
@@ -353,6 +364,12 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
             if (original instanceof Circle) return { minX: original.center.x - original.radius, maxX: original.center.x + original.radius, minY: original.center.y - original.radius, maxY: original.center.y + original.radius };
             if (original instanceof Ellipse) return { minX: original.center.x - original.radiusX, maxX: original.center.x + original.radiusX, minY: original.center.y - original.radiusY, maxY: original.center.y + original.radiusY };
             if (original instanceof Rectangle) return { minX: original.origin.x, maxX: original.origin.x + original.width, minY: original.origin.y, maxY: original.origin.y + original.height };
+            if (original instanceof Text) return {
+                minX: original.position.x,
+                maxX: original.position.x + Math.max(24, original.content.length * original.fontSize * 0.55),
+                minY: original.position.y - original.fontSize * 1.2,
+                maxY: original.position.y,
+            };
             if ((original instanceof Polygon || original instanceof Polyline) && original.points.length) {
                 const xs = original.points.map((p) => p.x);
                 const ys = original.points.map((p) => p.y);
@@ -380,6 +397,8 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                 shape.center = { x: original.center.x + dx, y: original.center.y + dy };
             } else if (shape instanceof Rectangle && original instanceof Rectangle) {
                 shape.origin = { x: original.origin.x + dx, y: original.origin.y + dy };
+            } else if (shape instanceof Text && original instanceof Text) {
+                shape.position = { x: original.position.x + dx, y: original.position.y + dy };
             } else if ((shape instanceof Polygon || shape instanceof Polyline) && (original instanceof Polygon || original instanceof Polyline)) {
                 shape.points = original.points.map((p) => ({ x: p.x + dx, y: p.y + dy }));
             }
@@ -600,6 +619,8 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                     shape.center = { x: orig.center.x + dx, y: orig.center.y + dy };
                 } else if (shape instanceof Rectangle && orig instanceof Rectangle) {
                     shape.origin = { x: orig.origin.x + dx, y: orig.origin.y + dy };
+                } else if (shape instanceof Text && orig instanceof Text) {
+                    shape.position = { x: orig.position.x + dx, y: orig.position.y + dy };
                 } else if ((shape instanceof Polygon || shape instanceof Polyline) && (orig instanceof Polygon || orig instanceof Polyline)) {
                     shape.points = orig.points.map((p) => ({ x: p.x + dx, y: p.y + dy }));
                 }
@@ -781,6 +802,21 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         const captureRect = (cursorRef.current instanceof CaptureSelectorCursor)
             ? cursorRef.current.getSelectionRect()
             : null;
+        
+        // Special handling for TextCursor
+        if (cursorRef.current instanceof TextCursor) {
+            if (textInputPosition) {
+                const shape = cursorRef.current.finish(force);
+                if (shape) {
+                    addShape(shape);
+                    setSelectedShapeIds(new Set([shape.getId() as string]));
+                }
+            }
+            setPreviewShape(null);
+            setIsDrawing(false);
+            return;
+        }
+        
         const shape = cursorRef.current.finish(force);
         if (cursorRef.current instanceof CaptureSelectorCursor) {
             const selectedShapes = cursorRef.current.getSelectedShapes();
@@ -814,6 +850,14 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         const point = toImagePoint(e);
         // Do not start drawing if the user pressed outside the image (black margins)
         if (!isPointInImage(point)) return;
+
+        // Special handling for text tool
+        if (resolvedTool === "text" && cursorRef.current instanceof TextCursor) {
+            setTextInputPosition(point);
+            setTextInputValue("");
+            setTextFontSize(32);
+            return;
+        }
 
         (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
         cursorRef.current.press(point, bounds);
@@ -945,6 +989,16 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                 maxY: Math.max(...ys),
             };
         }
+        if (shape instanceof Text) {
+            const width = Math.max(24, shape.content.length * shape.fontSize * 0.55);
+            const height = shape.fontSize * 1.2;
+            return {
+                minX: shape.position.x,
+                maxX: shape.position.x + width,
+                minY: shape.position.y - height,
+                maxY: shape.position.y,
+            };
+        }
         return null;
     };
 
@@ -980,6 +1034,13 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
             return {
                 x: Math.max(...xs),
                 y: Math.min(...ys),
+            };
+        }
+        if (shape instanceof Text) {
+            const width = Math.max(24, shape.content.length * shape.fontSize * 0.55);
+            return {
+                x: shape.position.x + width,
+                y: shape.position.y - shape.fontSize,
             };
         }
 
@@ -1286,6 +1347,122 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                         {renderSelectionPanel()}
                     </g>
                 </svg>
+            )}
+            {textInputPosition && resolvedTool === "text" && (
+                <div
+                    style={{
+                        position: "absolute",
+                        left: textInputPosition ? (width / 2 + (textInputPosition.x - viewState.x) * viewState.zoom) : 0,
+                        top: textInputPosition ? (height / 2 + (textInputPosition.y - viewState.y) * viewState.zoom) : 0,
+                        display: "inline-flex",
+                        flexWrap: "wrap",
+                        gap: "6px",
+                        alignItems: "center",
+                        padding: "6px",
+                        borderRadius: "12px",
+                        background: "rgba(14, 15, 17, 0.9)",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        boxShadow: "0 12px 24px rgba(0,0,0,0.24)",
+                        backdropFilter: "blur(12px)",
+                        zIndex: 400,
+                    }}
+                >
+                    <button
+                        onClick={() => setTextFontSize(prev => Math.max(8, prev - 2))}
+                        style={{
+                            width: "34px",
+                            height: "34px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            padding: 0,
+                            fontSize: "18px",
+                            border: "1px solid rgba(255,255,255,0.16)",
+                            background: "rgba(255,255,255,0.08)",
+                            color: "#E9EEF5",
+                            borderRadius: "10px",
+                            cursor: "pointer",
+                        }}
+                    >
+                        −
+                    </button>
+                    <span
+                        style={{
+                            minWidth: "52px",
+                            textAlign: "center",
+                            fontSize: "13px",
+                            color: "#E9EEF5",
+                            padding: "8px 10px",
+                            border: "1px solid rgba(255,255,255,0.12)",
+                            borderRadius: "10px",
+                            background: "rgba(255,255,255,0.06)",
+                        }}
+                    >
+                        {textFontSize}px
+                    </span>
+                    <button
+                        onClick={() => setTextFontSize(prev => Math.min(96, prev + 2))}
+                        style={{
+                            width: "34px",
+                            height: "34px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            padding: 0,
+                            fontSize: "18px",
+                            border: "1px solid rgba(255,255,255,0.16)",
+                            background: "rgba(255,255,255,0.08)",
+                            color: "#E9EEF5",
+                            borderRadius: "10px",
+                            cursor: "pointer",
+                        }}
+                    >
+                        +
+                    </button>
+                    <input
+                        type="text"
+                        value={textInputValue}
+                        onChange={(e) => setTextInputValue(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                                if (cursorRef.current instanceof TextCursor && textInputValue.trim()) {
+                                    cursorRef.current.setTextContent(textInputValue);
+                                    cursorRef.current.setFontSize(textFontSize);
+                                    cursorRef.current.press(textInputPosition, bounds);
+                                    const shape = cursorRef.current.finish();
+                                    if (shape) {
+                                        addShape(shape);
+                                        setSelectedShapeIds(new Set([shape.getId() as string]));
+                                    }
+                                }
+                                setTextInputPosition(null);
+                                setTextInputValue("");
+                                setTextFontSize(32);
+                                setPreviewShape(null);
+                                setIsDrawing(false);
+                            } else if (e.key === "Escape") {
+                                setTextInputPosition(null);
+                                setTextInputValue("");
+                                setTextFontSize(32);
+                                setPreviewShape(null);
+                                setIsDrawing(false);
+                            }
+                        }}
+                        autoFocus
+                        style={{
+                            padding: "8px 10px",
+                            fontSize: "14px",
+                            border: "1px solid rgba(255,255,255,0.16)",
+                            borderRadius: "12px",
+                            background: "rgba(255, 255, 255, 0.08)",
+                            color: "#E9EEF5",
+                            outline: "none",
+                            minWidth: "140px",
+                            maxWidth: "240px",
+                        }}
+                        placeholder="Entrez votre texte..."
+                    />
+                </div>
             )}
             {children && (
                 <div style={overlayStyle}>

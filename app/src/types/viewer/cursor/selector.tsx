@@ -47,21 +47,33 @@ export class ShapeSelectorCursor extends CanvaCursor {
         this.selectedShapes = [];
 
         if (rect) {
-            const selectionMinX = rect.x;
-            const selectionMaxX = rect.x + rect.width;
-            const selectionMinY = rect.y;
-            const selectionMaxY = rect.y + rect.height;
+            if (rect.width === 0 && rect.height === 0 && this.start) {
+                const clickX = this.start.x;
+                const clickY = this.start.y;
+                const hits = this.selectableShapes.filter((shape) => {
+                    const box = this.getShapeBBox(shape);
+                    return box ? clickX >= box.minX && clickX <= box.maxX && clickY >= box.minY && clickY <= box.maxY : false;
+                });
+                if (hits.length > 0) {
+                    this.selectedShapes = [hits[hits.length - 1]];
+                }
+            } else {
+                const selectionMinX = rect.x;
+                const selectionMaxX = rect.x + rect.width;
+                const selectionMinY = rect.y;
+                const selectionMaxY = rect.y + rect.height;
 
-            this.selectedShapes = this.selectableShapes.filter((shape) => {
-                const box = this.getShapeBBox(shape);
-                if (!box) return false;
-                return (
-                    box.maxX >= selectionMinX &&
-                    box.minX <= selectionMaxX &&
-                    box.maxY >= selectionMinY &&
-                    box.minY <= selectionMaxY
-                );
-            });
+                this.selectedShapes = this.selectableShapes.filter((shape) => {
+                    const box = this.getShapeBBox(shape);
+                    if (!box) return false;
+                    return (
+                        box.maxX >= selectionMinX &&
+                        box.minX <= selectionMaxX &&
+                        box.maxY >= selectionMinY &&
+                        box.minY <= selectionMaxY
+                    );
+                });
+            }
         }
 
         this.reset();

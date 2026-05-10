@@ -83,6 +83,8 @@ export abstract class Shape {
                 return Polygon.fromJson(json);
             case "polyline":
                 return Polyline.fromJson(json);
+            case "text":
+                return Text.fromJson(json);
             default:
                 throw new Error(`Unknown shape type: ${data.type}`);
         }
@@ -404,6 +406,65 @@ export class Polyline extends Shape implements Bordered {
             length: {
                 label: "Longueur",
                 value: `${length.toFixed(2)} ${unit}`
+            }
+        };
+    }
+}
+
+export class Text extends Shape {
+    
+    position: Point;
+    content: string;
+    fontSize: number;
+    fontColor: string;
+
+    constructor(position: Point, content: string, fontSize: number, fontColor: string, id?: UUIDTypes) {
+        super("text", id);
+        this.position = position;
+        this.content = content;
+        this.fontSize = fontSize;
+        this.fontColor = fontColor;
+    }
+
+    static fromJson(json: string): Text {
+        const data = JSON.parse(json);
+        return new Text(
+            data.position || { x: 0, y: 0 },
+            data.content || "",
+            data.fontSize || 16,
+            data.fontColor || "#000000",
+            data.id
+        );
+    }
+
+    render(): ReactNode {
+        return (
+            <text
+                x={this.position.x}
+                y={this.position.y}
+                fill={this.fontColor}
+                fontSize={this.fontSize}
+                fontFamily="Arial, sans-serif"
+                vectorEffect="non-scaling-stroke"
+            >
+                {this.content}
+            </text>
+        );
+    }
+
+    details(properties: Properties, _context?: DetailContext): Record<string, {label: ReactNode, value: ReactNode}> {
+        return {
+            text: {
+                label: "Texte",
+                value: this.content
+            },
+            fontSize: {
+                label: "Taille",
+                value: `${this.fontSize}px`
+            },
+            color: {
+                label: "Couleur",
+                value: this.fontColor
             }
         };
     }

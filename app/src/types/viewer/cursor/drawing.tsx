@@ -1,4 +1,4 @@
-import { Circle, Ellipse, Line, Polygon, Polyline, Rectangle, Shape } from "../shapes";
+import { Circle, Ellipse, Line, Polygon, Polyline, Rectangle, Text, Shape } from "../shapes";
 import type { Point } from "../shapes";
 import type { CursorBoundingBox, CursorType } from "./canva";
 import { CanvaCursor } from "./canva";
@@ -336,6 +336,53 @@ export class PolygonCursor extends DrawingCursor {
             this.points = [];
             this.isClosed = false;
             return polygon;
+        }
+        return null;
+    }
+}
+
+export class TextCursor extends DrawingCursor {
+    private position: Point | null = null;
+    private textContent: string = "";
+    private fontSize: number = 16;
+
+    constructor(strokeColor: string, strokeWidth: number) {
+        super("text", strokeColor, strokeWidth);
+    }
+
+    shouldRender(): boolean {
+        return this.position !== null && this.textContent.length > 0;
+    }
+
+    press(point: Point, _bounds?: CursorBoundingBox): void {
+        this.position = point;
+    }
+
+    move(point: Point, _bounds?: CursorBoundingBox): void {
+        // Text doesn't move dynamically
+    }
+
+    setTextContent(content: string): void {
+        this.textContent = content;
+    }
+
+    setFontSize(size: number): void {
+        this.fontSize = size;
+    }
+
+    createPreview(): Shape | null {
+        if (this.position && this.textContent) {
+            return new Text(this.position, this.textContent, this.fontSize, this.strokeColor);
+        }
+        return null;
+    }
+
+    finish(force?: boolean): Shape | null {
+        if (this.position && this.textContent) {
+            const text = new Text(this.position, this.textContent, this.fontSize, this.strokeColor);
+            this.position = null;
+            this.textContent = "";
+            return text;
         }
         return null;
     }

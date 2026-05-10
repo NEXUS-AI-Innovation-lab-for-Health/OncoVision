@@ -9,6 +9,7 @@ export {
     EllipseCursor,
     RectangleCursor,
     PolygonCursor,
+    TextCursor,
 } from "./cursor/drawing";
 export { ShapeSelectorCursor, CaptureSelectorCursor } from "./cursor/selector";
 export { ShapeSelectorCursor as SelectorCursor } from "./cursor/selector";

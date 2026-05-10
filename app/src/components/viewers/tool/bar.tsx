@@ -90,6 +90,12 @@ const ToolIcon = ({ name, size = 14 }: { name: string; size?: number }) => {
                     <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none" />
                 </svg>
             );
+        case "text":
+            return (
+                <svg {...common}>
+                    <path d="M4 7h16M6 7v10M18 7v10M6 17h12" />
+                </svg>
+            );
         default:
             return null;
     }
@@ -274,6 +280,16 @@ export default function Toolbar(props: ToolbarProps) {
                     style={{ color: activeTool === "capture" ? "#f59e0b" : "#E9EEF5", background: "transparent", border: "none", borderRadius: 8, display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-start", padding: "6px 10px" }}
                 >
                     Capture
+                </Button>
+
+                <Button
+                    type="text"
+                    size="small"
+                    icon={<ToolIcon name="text" />}
+                    onClick={() => setActiveTool("text")}
+                    style={{ color: activeTool === "text" ? "#1366FF" : "#E9EEF5", background: "transparent", border: "none", borderRadius: 8, display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-start", padding: "6px 10px" }}
+                >
+                    Texte
                 </Button>
 
                 <ToolbarItem
