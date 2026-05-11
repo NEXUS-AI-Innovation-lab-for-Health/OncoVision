@@ -1307,19 +1307,29 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                             {shapes.map((shape, idx) => {
                                 const elem = shape.render() as any;
                                 const shapeId = shape.getId() as string;
-                                if (hoveredInfo?.idx === idx || hoveredSelectionShapeId === shapeId) {
-                                    // override stroke and strokeWidth for highlight
+                                const isText = shape instanceof Text;
+                                const isMovingText = isText && movingShapeId === shapeId;
+
+                                if (!isText && (hoveredInfo?.idx === idx || hoveredSelectionShapeId === shapeId)) {
                                     const override: any = { stroke: "#409EFF" };
                                     const baseWidth = elem.props?.strokeWidth ?? UNIFORM_STROKE_WIDTH;
                                     if (typeof baseWidth === "number") override.strokeWidth = baseWidth + 2;
                                     return <g key={`shape-${idx}`}>{React.cloneElement(elem, override)}</g>;
                                 }
+
                                 if (selectedShapeIds.has(shapeId)) {
-                                    const override: any = { stroke: "#22c55e" };
-                                    const baseWidth = elem.props?.strokeWidth ?? UNIFORM_STROKE_WIDTH;
-                                    if (typeof baseWidth === "number") override.strokeWidth = baseWidth + 1.5;
-                                    return <g key={`shape-${idx}`}>{React.cloneElement(elem, override)}</g>;
+                                    if (isMovingText) {
+                                        const override: any = { fill: "#22c55e", fontWeight: "bold" };
+                                        return <g key={`shape-${idx}`}>{React.cloneElement(elem, override)}</g>;
+                                    }
+                                    if (!isText) {
+                                        const override: any = { stroke: "#22c55e" };
+                                        const baseWidth = elem.props?.strokeWidth ?? UNIFORM_STROKE_WIDTH;
+                                        if (typeof baseWidth === "number") override.strokeWidth = baseWidth + 1.5;
+                                        return <g key={`shape-${idx}`}>{React.cloneElement(elem, override)}</g>;
+                                    }
                                 }
+
                                 return <g key={`shape-${idx}`}>{elem}</g>;
                             })}
                             {previewShape && (
