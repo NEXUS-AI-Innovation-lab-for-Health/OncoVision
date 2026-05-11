@@ -203,6 +203,16 @@ interface ShapeDetailCardProps {
     onDeletePointerDown: (e: ReactPointerEvent<SVGGElement>) => void;
 }
 
+const MAX_DETAIL_LINE_LENGTH = 26;
+
+function wrapDetailValue(value: string, maxChars: number): string[] {
+    const lines: string[] = [];
+    for (let index = 0; index < value.length; index += maxChars) {
+        lines.push(value.slice(index, index + maxChars));
+    }
+    return lines;
+}
+
 export default function ShapeDetailCard({
     cardKey,
     shapeType,
@@ -216,7 +226,16 @@ export default function ShapeDetailCard({
     onMovePointerUp,
     onDeletePointerDown,
 }: ShapeDetailCardProps) {
-    const boxH = getShapeDetailBoxHeight(detailEntries.length);
+    const detailLines = detailEntries.flatMap((entry) => {
+        const valueLines = wrapDetailValue(String(entry.value), MAX_DETAIL_LINE_LENGTH);
+        const lines = [] as Array<{ label: ReactNode | null; value: string; isContinuation: boolean }>;
+        lines.push({ label: entry.label, value: valueLines[0] ?? "", isContinuation: false });
+        for (let i = 1; i < valueLines.length; i += 1) {
+            lines.push({ label: null, value: valueLines[i], isContinuation: true });
+        }
+        return lines;
+    });
+    const boxH = getShapeDetailBoxHeight(detailLines.length);
 
     return (
         <g
@@ -304,17 +323,19 @@ export default function ShapeDetailCard({
                 stroke="rgba(255,255,255,0.07)"
                 strokeWidth={0.5}
             />
-            {detailEntries.map((entry, detailIdx) => (
+            {detailLines.map((line, lineIdx) => (
                 <text
-                    key={`${cardKey}-line-${detailIdx}`}
+                    key={`${cardKey}-line-${lineIdx}`}
                     x={x + SHAPE_DETAIL_PAD}
-                    y={y + SHAPE_DETAIL_PAD + SHAPE_DETAIL_TITLE_HEIGHT + SHAPE_DETAIL_SEPARATOR_HEIGHT + (detailIdx + 1) * SHAPE_DETAIL_LINE_HEIGHT - 2}
+                    y={y + SHAPE_DETAIL_PAD + SHAPE_DETAIL_TITLE_HEIGHT + SHAPE_DETAIL_SEPARATOR_HEIGHT + (lineIdx + 1) * SHAPE_DETAIL_LINE_HEIGHT - 2}
                     fontSize={9}
                     fontFamily="system-ui, sans-serif"
                     style={{ userSelect: "none" }}
                 >
-                    <tspan fill="rgba(141,179,255,0.75)" fontWeight={500}>{entry.label}: </tspan>
-                    <tspan fill="rgba(255,255,255,0.85)">{entry.value}</tspan>
+                    {!line.isContinuation && (
+                        <tspan fill="rgba(141,179,255,0.75)" fontWeight={500}>{line.label}: </tspan>
+                    )}
+                    <tspan fill="rgba(255,255,255,0.85)">{line.value}</tspan>
                 </text>
             ))}
         </g>
