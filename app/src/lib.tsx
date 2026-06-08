@@ -5,7 +5,8 @@
 export { default as ImageViewer } from './components/viewers/image';
 export { default as Canva } from './components/viewers/canva';
 export { default as ImagePreview } from './components/viewers/preview';
-export { SelectionPanel, ShapeDetailCard } from './components/viewers/detail';
+export { SelectionPanel } from './components/viewers/detail';
+export { default as ShapeDetailCard } from './components/viewers/detail';
 export { default as CaptureDialog } from './components/viewers/capture';
 
 // Composants de la barre d'outils
@@ -29,7 +30,6 @@ export type {
 export type { DrawingAction } from './types/viewer/action';
 export type { CursorType } from './types/viewer/cursor/canva';
 export type { CanvaTool, Properties, CanvaViewState } from './components/viewers/canva';
-export type { ImageViewerProps } from './components/viewers/image';
 
 // Hooks
 export { useHistory } from './hooks/history';
