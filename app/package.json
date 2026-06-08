@@ -1,5 +1,5 @@
 {
-  "name": "app",
+  "name": "oncovisio",
   "version": "0.0.0",
   "type": "module",
   "main": "./dist/lib/index.js",
