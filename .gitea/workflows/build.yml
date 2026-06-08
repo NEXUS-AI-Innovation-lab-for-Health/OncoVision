@@ -2,8 +2,6 @@ name: Build
 
 on:
   push:
-    branches:
-        - main
 
 jobs:
 
@@ -23,7 +21,40 @@ jobs:
         run: |
           docker build -t localhost:5000/sae-app:latest -f Dockerfile .
           docker push localhost:5000/sae-app:latest
-    
+
+  app-lib:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: app
+
+      - name: Set package version
+        run: npm pkg set version="${{ vars.version }}"
+        working-directory: app
+
+      - name: Build package
+        run: npm run build:lib
+        working-directory: app
+
+      - name: Setup credentials
+        run: |
+          npm config set registry "https://${{ vars.package_url }}npm/"
+          npm config set @super_crafting:registry "https://${{ vars.package_url }}npm/"
+          npm config set -- "//${{ vars.package_url }}npm/:_authToken" "${{ secrets.PACKAGE_TOKEN }}"
+
+      - name: Publish package
+        run: npm publish --registry "https://${{ vars.package_url }}npm/"
+        working-directory: app
+
   rest:
     runs-on: ubuntu-latest
 
@@ -40,17 +71,3 @@ jobs:
         run: |
           docker build -t localhost:5000/sae-rest:latest -f Dockerfile .
           docker push localhost:5000/sae-rest:latest
-
-  sync-compose:
-    runs-on: ubuntu-latest
-    container:
-      image: node:16-buster-slim
-      volumes:
-        - /home/super_crafting/sae:/sae  
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Copy compose file to workspace
-        run: |
-          cp compose.yml /sae/compose.yml
