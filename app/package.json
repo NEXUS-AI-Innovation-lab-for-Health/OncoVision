@@ -1,5 +1,5 @@
 {
-  "name": "oncovisio",
+  "name": "oncovision",
   "version": "0.0.0",
   "type": "module",
   "main": "./dist/lib/index.js",
