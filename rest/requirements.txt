@@ -1,8 +1,5 @@
 uvicorn
 fastapi
-sqlmodel
-alembic
-pymysql
 cryptography
 python-dotenv
 s3fs

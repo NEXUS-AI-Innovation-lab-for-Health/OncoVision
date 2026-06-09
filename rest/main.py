@@ -5,7 +5,6 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from database.sql.connection import SQLConnection, SQLCredentials
 from database.s3.connection import S3Connection, S3Credentials
 from database.mongo.connection import MongoConnection, MongoCredentials
 
@@ -44,22 +43,6 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     traceback.print_exc()
     # Return a simple response to ensure the client sees status code
     return PlainTextResponse(str(exc.detail or exc), status_code=exc.status_code)
-
-# Initialize sql database connections
-sql_credentials = SQLCredentials(
-    host=os.getenv("SQL_HOST", "localhost"),
-    port=int(os.getenv("SQL_PORT", 3306)),
-    user=os.getenv("SQL_USER", "user"),
-    password=os.getenv("SQL_PASSWORD", "password"),
-    name=os.getenv("SQL_DATABASE", "database"),
-)
-sql_connection = SQLConnection(sql_credentials)
-try:
-    sql_session = sql_connection.connect()
-    print("SQL database connection established successfully.")
-except Exception as e:
-    print(f"Failed to establish SQL database connection: {e}")
-    exit(1)
 
 # Initialize s3 storage connection
 # Setup S3 Connection
