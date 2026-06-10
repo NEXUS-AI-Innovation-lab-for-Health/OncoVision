@@ -30,7 +30,7 @@ function ImageThumb({ imageId, selected, onClick, get, width = 140, height = 90 
         let cancelled = false;
         setLoading(true);
 
-        get({ endpoint: `viewer/images/${imageId}/level/0.webp`, blob: true, auth: false })
+        get({ endpoint: `viewer/images/${imageId}/preview`, blob: true, auth: false })
             .then((blob) => {
                 if (cancelled || !(blob instanceof Blob)) return;
                 const url = URL.createObjectURL(blob);
