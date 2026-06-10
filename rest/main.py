@@ -12,7 +12,8 @@ import models as _ # Load models
 
 # Import controllers
 from controllers.image import ImageController
-from controllers.draw import DrawController
+from controllers.draw import DrawController, DrawSession
+from controllers.room import RoomController
 
 # Load env. variables
 dotenv.load_dotenv()
@@ -81,9 +82,12 @@ except Exception as e:
     print(f"Failed to establish MongoDB connection: {e}")
     exit(1)
 
+sessions: dict[str, DrawSession] = {}
+
 routers = [
     ImageController(s3_connection, mongo_connection),
-    DrawController(mongo_connection),
+    RoomController(sessions),
+    DrawController(mongo_connection, sessions),
 ]
 for router in routers:
     app.include_router(router)

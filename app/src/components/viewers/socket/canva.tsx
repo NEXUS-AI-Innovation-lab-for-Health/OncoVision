@@ -18,7 +18,7 @@ interface HandshakedMessage extends WebSocketMessage {
     roomId: string;
     authorId: string;
     color: string;
-    shapes: Shape[];
+    shapes: Record<string, Shape[]>;
     pastActions: object[];
     futureActions: object[];
 }
@@ -108,7 +108,9 @@ const CanvaSocket = forwardRef<CanvaHandle, CanvaSocketProps>(function CanvaSock
             authorIdRef.current = message.authorId;
             sessionStorage.setItem(`authorId:${roomIdRef.current}`, message.authorId);
 
-            const shapes: Shape[] = Shape.fromRawArray(message.shapes);
+            // Extract shapes for the current imageId
+            const imageShapes = message.shapes[props.imageId] || [];
+            const shapes: Shape[] = Shape.fromRawArray(imageShapes);
 
             const past: DrawingAction[] = (message.pastActions ?? []).map(drawingActionFromRaw);
             const future: DrawingAction[] = (message.futureActions ?? []).map(drawingActionFromRaw);

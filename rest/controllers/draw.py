@@ -32,53 +32,56 @@ class DrawAuthor:
 class DrawSession:
     room_id: str
     room_name: str
-    image_id: str
+    image_ids: list[str]
     authors: dict[WebSocket, DrawAuthor]
     known_authors: dict[str, DrawAuthor]
-    shapes: list[ShapeUnion]
+    shapes: dict[str, list[ShapeUnion]]
 
-    def __init__(self, room_id: str, room_name: str, image_id: str):
+    def __init__(self, room_id: str, room_name: str, image_ids: list[str]):
         self.room_id = room_id
         self.room_name = room_name
-        self.image_id = image_id
+        self.image_ids = image_ids
         self.authors = {}
         self.known_authors = {}
-        self.shapes = []
+        self.shapes = {img_id: [] for img_id in image_ids}
 
     def as_document(self):
-        shapes = []
-        for shape in self.shapes:
-            doc = shape.model_dump()
-            # id may be a uuid.UUID object; convert to str for MongoDB storage.
-            if isinstance(doc.get("id"), (bytes,)):
-                doc["id"] = str(doc["id"])
-            elif doc.get("id") is not None:
-                doc["id"] = str(doc["id"])
-            shapes.append(doc)
+        shapes_dict = {}
+        for img_id, shapes in self.shapes.items():
+            img_shapes = []
+            for shape in shapes:
+                doc = shape.model_dump()
+                # id may be a uuid.UUID object; convert to str for MongoDB storage.
+                if isinstance(doc.get("id"), (bytes,)):
+                    doc["id"] = str(doc["id"])
+                elif doc.get("id") is not None:
+                    doc["id"] = str(doc["id"])
+                img_shapes.append(doc)
+            shapes_dict[img_id] = img_shapes
 
         return {
             "room_id": self.room_id,
             "room_name": self.room_name,
-            "image_id": self.image_id,
+            "image_ids": self.image_ids,
             "known_authors": {
                 aid: {"author_id": a.author_id, "name": a.name, "color": a.color}
                 for aid, a in self.known_authors.items()
             },
-            "shapes": shapes,
+            "shapes": shapes_dict,
         }
 
 
 class RoomInfo(CamelModel):
     room_id: str
     room_name: str
-    image_id: str
+    image_ids: list[str]
     participant_count: int
     participants: list[dict] = []
 
 
 class CreateRoomRequest(CamelModel):
     name: str
-    image_id: str
+    image_ids: list[str]
 
 
 class HandshakeMessage(WebSocketMessage, type="handshake"):
@@ -91,7 +94,7 @@ class HandshakedMessage(WebSocketMessage, type="handshaked"):
     room_id: str
     author_id: str
     color: str
-    shapes: list[ShapeUnion]
+    shapes: dict[str, list[ShapeUnion]]
     past_actions: list[dict] = []
     future_actions: list[dict] = []
 
@@ -102,16 +105,19 @@ class DrawingAction(CamelModel):
 
 class ShapeCreateAction(DrawingAction):
     type: Literal["shape_create"] = "shape_create"
+    image_id: str
     shapes: list[ShapeUnion]
 
 
 class ShapeDeleteAction(DrawingAction):
     type: Literal["shape_delete"] = "shape_delete"
+    image_id: str
     shapes: list[ShapeUnion]
 
 
 class ShapeEditAction(DrawingAction):
     type: Literal["shape_edit"] = "shape_edit"
+    image_id: str
     previous_shape: ShapeUnion
     shape: ShapeUnion
 
@@ -139,75 +145,33 @@ class LeaveMessage(WebSocketMessage, type="leave"):
 
 class DrawController(Controller, WebSocketHandler):
 
-    def __init__(self, mongo_connection: MongoConnection) -> None:
+    def __init__(self, mongo_connection: MongoConnection, sessions: dict[str, DrawSession]) -> None:
         super().__init__("draw")
         WebSocketHandler.__init__(self)
 
         mongo_database = mongo_connection.get_database()
         self.collection = mongo_database["drawings"]
 
-        self.sessions: dict[str, DrawSession] = {}
+        self.sessions = sessions
         self.add_api_websocket_route("/join_draw", self.handle_socket)
 
-        self.add_api_route("/rooms", self.list_rooms, methods=["GET"])
-        self.add_api_route("/rooms", self.create_room, methods=["POST"])
-        self.add_api_route("/rooms/{room_id}", self.get_room, methods=["GET"])
-
-    def list_rooms(self) -> list[RoomInfo]:
-        result = []
-        for session in self.sessions.values():
-            result.append(RoomInfo(
-                room_id=session.room_id,
-                room_name=session.room_name,
-                image_id=session.image_id,
-                participant_count=len(session.authors),
-                participants=[
-                    {"authorId": a.author_id, "name": a.name, "color": a.color}
-                    for a in session.known_authors.values()
-                ],
-            ))
-        return result
-
-    def create_room(self, request: CreateRoomRequest) -> RoomInfo:
-        room_id = str(uuid.uuid4())
-        session = DrawSession(room_id=room_id, room_name=request.name, image_id=request.image_id)
-        self.sessions[room_id] = session
-        return RoomInfo(
-            room_id=room_id,
-            room_name=request.name,
-            image_id=request.image_id,
-            participant_count=0,
-            participants=[],
-        )
-
-    def get_room(self, room_id: str) -> RoomInfo:
-        session = self.sessions.get(room_id)
-        if not session:
-            raise HTTPException(status_code=404, detail="Room not found")
-        return RoomInfo(
-            room_id=session.room_id,
-            room_name=session.room_name,
-            image_id=session.image_id,
-            participant_count=len(session.authors),
-            participants=[
-                {"authorId": a.author_id, "name": a.name, "color": a.color}
-                for a in session.known_authors.values()
-            ],
-        )
-
     def _apply_action(self, session: DrawSession, action: DrawingActionUnion) -> None:
+        image_id = action.image_id
+        if image_id not in session.shapes:
+            session.shapes[image_id] = []
+
         if isinstance(action, ShapeCreateAction):
-            session.shapes.extend(action.shapes)
+            session.shapes[image_id].extend(action.shapes)
             return
 
         if isinstance(action, ShapeDeleteAction):
             ids = {shape.id for shape in action.shapes}
-            session.shapes = [shape for shape in session.shapes if shape.id not in ids]
+            session.shapes[image_id] = [shape for shape in session.shapes[image_id] if shape.id not in ids]
             return
 
         if isinstance(action, ShapeEditAction):
             shape_id = action.shape.id
-            session.shapes = [action.shape if shape.id == shape_id else shape for shape in session.shapes]
+            session.shapes[image_id] = [action.shape if shape.id == shape_id else shape for shape in session.shapes[image_id]]
 
     @staticmethod
     def _action_to_dict(action: DrawingActionUnion) -> dict:

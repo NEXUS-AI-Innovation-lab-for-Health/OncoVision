@@ -88,6 +88,8 @@ export type CanvaProps = {
     // Optional image bounds (in image pixel coordinates). If provided, drawing is limited to these bounds.
     imageWidth?: number;
     imageHeight?: number;
+    /** The ID of the image currently being drawn on. */
+    imageId: string;
     children?: ReactNode;
 }
 
@@ -244,7 +246,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         });
         onShapeCreated?.(shape);
         if (!skipHistory) {
-            const action = new ShapeCreateAction([shape]);
+            const action = new ShapeCreateAction(props.imageId, [shape]);
             history.push(action);
             onActionRef.current?.(action);
             notifyHistory();
@@ -324,7 +326,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
             return next;
         });
         if (deleted) {
-            const action = new ShapeDeleteAction([deleted]);
+            const action = new ShapeDeleteAction(props.imageId, [deleted]);
             history.push(action);
             onActionRef.current?.(action);
             notifyHistory();
@@ -456,7 +458,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
             const offset = computeShapeOffset(shape, original);
             if (offset.dx !== 0 || offset.dy !== 0) {
                 const movedShape = cloneShape(shape);
-                const action = new ShapeEditAction(original, movedShape);
+                const action = new ShapeEditAction(props.imageId, original, movedShape);
                 history.push(action);
                 onActionRef.current?.(action);
                 notifyHistory();
@@ -491,15 +493,15 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                 return next;
             });
             // Propagate inverse action so remote clients stay in sync
-            propagate?.(new ShapeDeleteAction(action.shapes));
+            propagate?.(new ShapeDeleteAction(action.imageId, action.shapes));
         } else if (action instanceof ShapeDeleteAction) {
             setShapes(prev => [...prev, ...action.shapes]);
-            propagate?.(new ShapeCreateAction(action.shapes));
+            propagate?.(new ShapeCreateAction(action.imageId, action.shapes));
         } else if (action instanceof ShapeEditAction) {
             const id = action.previousShape.getId() as string;
             setShapes(prev => prev.map(s => (s.getId() as string) === id ? action.previousShape : s));
             // Propagate a shape_edit with swapped before/after so remotes restore the previous state
-            propagate?.(new ShapeEditAction(action.shape, action.previousShape));
+            propagate?.(new ShapeEditAction(action.imageId, action.shape, action.previousShape));
         }
         notifyHistory();
     };
@@ -510,7 +512,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         const propagate = onRedoActionRef.current ?? onActionRef.current;
         if (action instanceof ShapeCreateAction) {
             setShapes(prev => [...prev, ...action.shapes]);
-            propagate?.(new ShapeCreateAction(action.shapes));
+            propagate?.(new ShapeCreateAction(action.imageId, action.shapes));
         } else if (action instanceof ShapeDeleteAction) {
             const ids = new Set(action.shapes.map(s => s.getId() as string));
             setShapes(prev => prev.filter(s => !ids.has(s.getId() as string)));
@@ -520,11 +522,11 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                 for (const id of ids) next.delete(id);
                 return next;
             });
-            propagate?.(new ShapeDeleteAction(action.shapes));
+            propagate?.(new ShapeDeleteAction(action.imageId, action.shapes));
         } else if (action instanceof ShapeEditAction) {
             const id = action.shape.getId() as string;
             setShapes(prev => prev.map(s => (s.getId() as string) === id ? action.shape : s));
-            propagate?.(new ShapeEditAction(action.previousShape, action.shape));
+            propagate?.(new ShapeEditAction(action.imageId, action.previousShape, action.shape));
         }
         notifyHistory();
     };
@@ -537,7 +539,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         setSelectedShapeIds(new Set());
         setMovingShapeId(null);
         if (deleted.length > 0) {
-            const action = new ShapeDeleteAction(deleted);
+            const action = new ShapeDeleteAction(props.imageId, deleted);
             history.push(action);
             onActionRef.current?.(action);
             notifyHistory();
@@ -682,7 +684,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                             const live = liveByid.get(orig.getId() as string);
                             if (!live) continue;
                             const movedShape = cloneShape(live);
-                            const action = new ShapeEditAction(orig, movedShape);
+                            const action = new ShapeEditAction(props.imageId, orig, movedShape);
                             history.push(action);
                             onActionRef.current?.(action);
                         }
