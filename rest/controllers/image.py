@@ -6,6 +6,7 @@ import time
 import shutil
 import zipfile
 import tempfile
+import math
 
 from fastapi import UploadFile, File, Form, HTTPException
 from fastapi.responses import Response
@@ -30,7 +31,7 @@ class ImageController(Controller):
         self.registry = ImageRegistry(s3_connection, bucket, mongo_connection=mongo_connection)
 
         self.add_api_route("/images", self.list_images, methods=["GET"])
-        self.add_api_route("/images", self.upload_image, methods=["POST"])
+        self.add_api_route("/images/upload", self.upload_image, methods=["POST"])
         self.add_api_route("/images/{image_id}/info", self.get_info, methods=["GET"])
         self.add_api_route("/images/{image_id}.dzi", self.get_dzi, methods=["GET"])
         self.add_api_route(
@@ -41,6 +42,11 @@ class ImageController(Controller):
         self.add_api_route(
             "/images/{image_id}/tile/{level}/{tx}_{ty}.webp",
             self.get_tile_png,
+            methods=["GET"],
+        )
+        self.add_api_route(
+            "/images/{image_id}/preview",
+            self.get_preview,
             methods=["GET"],
         )
 
@@ -175,6 +181,28 @@ class ImageController(Controller):
             raise HTTPException(status_code=404, detail=str(e))
 
         return Response(content=png_bytes, media_type="image/webp")
+
+    def get_preview(self, image_id: str):
+        record = self._get_record(image_id)
+        max_level = record.levels - 1
+        target_size = 1024
+        
+        # Trouver le niveau le plus élevé dont la dimension maximale est <= target_size
+        preview_level = max_level
+        for level in range(max_level, -1, -1):
+            scale = 2 ** (level - max_level)
+            w = int(math.ceil(record.width * scale))
+            h = int(math.ceil(record.height * scale))
+            if max(w, h) <= target_size:
+                preview_level = level
+                break
+        
+        try:
+            preview_bytes = self.registry.get_level_png(image_id, preview_level)
+        except Exception as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+        return Response(content=preview_bytes, media_type="image/webp")
 
     def _get_record(self, image_id: str) -> ImageRecord:
         try:
