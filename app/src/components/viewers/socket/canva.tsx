@@ -108,8 +108,13 @@ const CanvaSocket = forwardRef<CanvaHandle, CanvaSocketProps>(function CanvaSock
             authorIdRef.current = message.authorId;
             sessionStorage.setItem(`authorId:${roomIdRef.current}`, message.authorId);
 
+            console.log("Handshaked received. Available image IDs in shapes:", Object.keys(message.shapes));
+            console.log("Requesting shapes for current imageId:", props.imageId);
+            
             // Extract shapes for the current imageId
             const imageShapes = message.shapes[props.imageId] || [];
+            console.log("Extracted shapes count for this image:", imageShapes.length);
+            
             const shapes: Shape[] = Shape.fromRawArray(imageShapes);
 
             const past: DrawingAction[] = (message.pastActions ?? []).map(drawingActionFromRaw);

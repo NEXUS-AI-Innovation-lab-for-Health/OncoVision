@@ -139,6 +139,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
     onCapture,
     imageWidth,
     imageHeight,
+    imageId,
     children,
 }: CanvaProps, ref) {
 
@@ -246,7 +247,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         });
         onShapeCreated?.(shape);
         if (!skipHistory) {
-            const action = new ShapeCreateAction(props.imageId, [shape]);
+            const action = new ShapeCreateAction(imageId, [shape]);
             history.push(action);
             onActionRef.current?.(action);
             notifyHistory();
@@ -326,7 +327,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
             return next;
         });
         if (deleted) {
-            const action = new ShapeDeleteAction(props.imageId, [deleted]);
+            const action = new ShapeDeleteAction(imageId, [deleted]);
             history.push(action);
             onActionRef.current?.(action);
             notifyHistory();
@@ -458,7 +459,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
             const offset = computeShapeOffset(shape, original);
             if (offset.dx !== 0 || offset.dy !== 0) {
                 const movedShape = cloneShape(shape);
-                const action = new ShapeEditAction(props.imageId, original, movedShape);
+                const action = new ShapeEditAction(imageId, original, movedShape);
                 history.push(action);
                 onActionRef.current?.(action);
                 notifyHistory();
@@ -539,7 +540,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
         setSelectedShapeIds(new Set());
         setMovingShapeId(null);
         if (deleted.length > 0) {
-            const action = new ShapeDeleteAction(props.imageId, deleted);
+            const action = new ShapeDeleteAction(imageId, deleted);
             history.push(action);
             onActionRef.current?.(action);
             notifyHistory();
@@ -684,7 +685,7 @@ const Canva = forwardRef<CanvaHandle, CanvaProps>(function Canva({
                             const live = liveByid.get(orig.getId() as string);
                             if (!live) continue;
                             const movedShape = cloneShape(live);
-                            const action = new ShapeEditAction(props.imageId, orig, movedShape);
+                            const action = new ShapeEditAction(imageId, orig, movedShape);
                             history.push(action);
                             onActionRef.current?.(action);
                         }
