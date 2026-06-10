@@ -14,8 +14,10 @@ interface ImageUploaderProps {
     onLeaveRoom: () => void;
 }
 
-export default function ImageUploader({ room, author, onLeaveRoom }: ImageUploaderProps) {
+export default function ImageUploader(props: ImageUploaderProps) {
 
+    const { room, author, onLeaveRoom } = props;
+    
     const [file, setFile] = useState<File | null>(null);
     const [responseId, setResponseId] = useState<string>("");
     const [authorId, setAuthorId] = useState<string | null>(author.authorId);

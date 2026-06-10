@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import dts from 'vite-plugin-dts'
 import { resolve } from 'path'
 
 // Configuration Vite pour builder la lib de viewers
@@ -12,6 +13,11 @@ export default defineConfig({
       babel: {
         plugins: [['@babel/plugin-proposal-decorators', { legacy: true }]],
       },
+    }),
+    dts({
+      rollupTypes: true,
+      outDir: 'dist',
+      tsconfigPath: './tsconfig.lib.json',
     }),
   ],
 

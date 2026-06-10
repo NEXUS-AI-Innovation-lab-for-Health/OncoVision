@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "declarationDir": "./dist",
+    "emitDeclarationOnly": true
+  },
+  "include": ["src/lib.tsx", "src/components", "src/hooks", "src/types", "src/utils", "src/env.d.ts"]
+}
