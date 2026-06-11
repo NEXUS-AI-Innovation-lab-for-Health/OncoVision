@@ -672,6 +672,7 @@ export default function ImageViewer(props: ImageViewerProps) {
     const minZoom = getFitZoom();
 
     const defaultCanvaProps: CanvaProps = {
+        imageId,
         viewState,
         width: canvasSize.w,
         height: canvasSize.h,
