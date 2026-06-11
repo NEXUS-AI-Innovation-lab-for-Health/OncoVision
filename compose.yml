@@ -38,11 +38,6 @@ services:
       S3_PORT: ${S3_PORT}
       S3_USER: ${S3_USER}
       S3_PASSWORD: ${S3_PASSWORD}
-      SQL_HOST: ${SQL_HOST}
-      SQL_PORT: ${SQL_PORT}
-      SQL_USER: ${SQL_USER}
-      SQL_PASSWORD: ${SQL_PASSWORD}
-      SQL_DATABASE: ${SQL_DATABASE}
 
       VIRTUAL_HOST: sae-api.jdsr.dev
       VIRTUAL_PORT: 8000
@@ -51,7 +46,6 @@ services:
     depends_on:
       - mongodb
       - minio
-      - mysql
     networks:
       - onco_network
       - center
