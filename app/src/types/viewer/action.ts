@@ -9,31 +9,39 @@ export interface DrawingAction {
 
 export class ShapeCreateAction implements DrawingAction {
     readonly type = 'shape_create' as const;
+    readonly imageId: string;
     readonly shapes: Shape[];
-    constructor(shapes: Shape[]) { this.shapes = shapes; }
+    constructor(imageId: string, shapes: Shape[]) { 
+        this.imageId = imageId;
+        this.shapes = shapes; 
+    }
 
     toJson(): string {
-        return JSON.stringify({ type: this.type, shapes: this.shapes });
+        return JSON.stringify({ type: this.type, imageId: this.imageId, shapes: this.shapes });
     }
 
     static fromJson(json: string): ShapeCreateAction {
         const data = JSON.parse(json);
-        return new ShapeCreateAction(Shape.fromRawArray(data.shapes));
+        return new ShapeCreateAction(data.imageId, Shape.fromRawArray(data.shapes));
     }
 }
 
 export class ShapeDeleteAction implements DrawingAction {
     readonly type = 'shape_delete' as const;
+    readonly imageId: string;
     readonly shapes: Shape[];
-    constructor(shapes: Shape[]) { this.shapes = shapes; }
+    constructor(imageId: string, shapes: Shape[]) { 
+        this.imageId = imageId;
+        this.shapes = shapes; 
+    }
 
     toJson(): string {
-        return JSON.stringify({ type: this.type, shapes: this.shapes });
+        return JSON.stringify({ type: this.type, imageId: this.imageId, shapes: this.shapes });
     }
 
     static fromJson(json: string): ShapeDeleteAction {
         const data = JSON.parse(json);
-        return new ShapeDeleteAction(Shape.fromRawArray(data.shapes));
+        return new ShapeDeleteAction(data.imageId, Shape.fromRawArray(data.shapes));
     }
 }
 
@@ -43,22 +51,24 @@ export class ShapeDeleteAction implements DrawingAction {
  */
 export class ShapeEditAction implements DrawingAction {
     readonly type = 'shape_edit' as const;
+    readonly imageId: string;
     /** Complete shape BEFORE the edit — used to restore on undo. */
     readonly previousShape: Shape;
     /** Complete shape AFTER the edit — applied on redo and propagated to remote clients. */
     readonly shape: Shape;
-    constructor(previousShape: Shape, shape: Shape) {
+    constructor(imageId: string, previousShape: Shape, shape: Shape) {
+        this.imageId = imageId;
         this.previousShape = previousShape;
         this.shape = shape;
     }
 
     toJson(): string {
-        return JSON.stringify({ type: this.type, previousShape: this.previousShape, shape: this.shape });
+        return JSON.stringify({ type: this.type, imageId: this.imageId, previousShape: this.previousShape, shape: this.shape });
     }
 
     static fromJson(json: string): ShapeEditAction {
         const data = JSON.parse(json);
-        return new ShapeEditAction(Shape.fromRaw(data.previousShape), Shape.fromRaw(data.shape));
+        return new ShapeEditAction(data.imageId, Shape.fromRaw(data.previousShape), Shape.fromRaw(data.shape));
     }
 }
 
