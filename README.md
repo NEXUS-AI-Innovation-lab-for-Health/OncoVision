@@ -61,11 +61,31 @@ Construire et publier ces images vers votre registry avant le déploiement.
 
 ### 2) Préparer les variables d'environnement
 Créer un fichier `.env` à la racine du projet avec les variables utilisées par `compose.yml`:
-- `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`
-- `MONGO_INITDB_ROOT_USERNAME`, `MONGO_INITDB_ROOT_PASSWORD`, `MONGO_INITDB_DATABASE`
-- `PORT`, `MONGO_HOST`, `MONGO_PORT`, `MONGO_USER`, `MONGO_PASSWORD`, `MONGO_DATABASE`
-- `S3_HOST`, `S3_PORT`, `S3_USER`, `S3_PASSWORD`
-- `API_URL`
+```dotenv
+# MinIO
+MINIO_ROOT_USER=root
+MINIO_ROOT_PASSWORD=change-me
+
+# Mongo init
+MONGO_INITDB_ROOT_USERNAME=root
+MONGO_INITDB_ROOT_PASSWORD=change-me
+MONGO_INITDB_DATABASE=onco_vision
+
+# API REST (conteneur rest)
+PORT=8000
+MONGO_HOST=mongodb
+MONGO_PORT=27017
+MONGO_USER=root
+MONGO_PASSWORD=change-me
+MONGO_DATABASE=onco_vision
+S3_HOST=http://minio
+S3_PORT=9000
+S3_USER=root
+S3_PASSWORD=change-me
+
+# Frontend (conteneur web)
+API_URL=https://votre-api.exemple.com
+```
 
 ### 3) Préparer le réseau Docker externe
 Le `compose.yml` production référence un réseau externe nommé `center`.
