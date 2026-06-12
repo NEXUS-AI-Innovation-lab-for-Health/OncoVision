@@ -38,33 +38,22 @@ services:
       S3_PORT: ${S3_PORT}
       S3_USER: ${S3_USER}
       S3_PASSWORD: ${S3_PASSWORD}
-
-      VIRTUAL_HOST: sae-api.jdsr.dev
-      VIRTUAL_PORT: 8000
-      SSL_CERTIFICATE: /ssl/sae-api.jdsr.dev/fullchain.pem
-      SSL_CERTIFICATE_KEY: /ssl/sae-api.jdsr.dev/privkey.pem
     depends_on:
       - mongodb
       - minio
     networks:
       - onco_network
-      - center
 
   web:
     image: localhost:5000/sae-app:latest
     container_name: onco_web
     environment:
-      VIRTUAL_HOST: sae.jdsr.dev
-      VIRTUAL_PORT: 5173
       API_URL: ${API_URL}
     depends_on:
       - rest
     networks:
       - onco_network
-      - center
 
 networks:
   onco_network:
     name: onco_network
-  center:
-    external: true

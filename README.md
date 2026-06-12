@@ -88,18 +88,12 @@ S3_PASSWORD=change-me
 API_URL=https://votre-api.exemple.com
 ```
 
-### 3) Préparer le réseau Docker externe
-Le `compose.yml` production référence un réseau externe nommé `center` (nom attendu tel quel par la configuration actuelle).
-```bash
-docker network create center
-```
-
-### 4) Lancer la stack
+### 3) Lancer la stack
 ```bash
 docker compose -f compose.yml up -d
 ```
 
-### 5) Arrêter la stack
+### 4) Arrêter la stack
 ```bash
 docker compose -f compose.yml down
 ```
