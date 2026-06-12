@@ -84,11 +84,12 @@ S3_USER=root
 S3_PASSWORD=change-me
 
 # Frontend (conteneur web)
+# Remplacer par l'URL réelle de votre API en production
 API_URL=https://votre-api.exemple.com
 ```
 
 ### 3) Préparer le réseau Docker externe
-Le `compose.yml` production référence un réseau externe nommé `center`.
+Le `compose.yml` production référence un réseau externe nommé `center` (nom attendu tel quel par la configuration actuelle).
 ```bash
 docker network create center
 ```
