@@ -17,16 +17,17 @@ Guide de setup du projet en **mode développement** et **mode production**.
 ---
 
 ## Mode développement
+Exécuter les commandes suivantes depuis la racine du projet.
 
 ### 1) Lancer les services de données + segmenter
 ```bash
-cd /home/runner/work/OncoVision/OncoVision/SuperCrafting/OncoVision/docker
+cd docker
 docker compose up -d
 ```
 
 ### 2) Configurer et lancer l'API REST
 ```bash
-cd /home/runner/work/OncoVision/OncoVision/SuperCrafting/OncoVision/rest
+cd rest
 cp example.env .env
 pip install -r requirements.txt
 fastapi run main.py --reload --port 8000
@@ -34,7 +35,7 @@ fastapi run main.py --reload --port 8000
 
 ### 3) Configurer et lancer le frontend
 ```bash
-cd /home/runner/work/OncoVision/OncoVision/SuperCrafting/OncoVision/app
+cd app
 cp .env.example .env
 npm install
 npm run dev
@@ -49,6 +50,7 @@ Swagger (dev): http://localhost:8000/docs
 ## Mode production
 
 Le déploiement de production s'appuie sur le `compose.yml` racine.
+Exécuter les commandes suivantes depuis la racine du projet.
 
 ### 1) Préparer les images
 Le fichier racine utilise les images suivantes:
@@ -73,7 +75,6 @@ docker network create center
 
 ### 4) Lancer la stack
 ```bash
-cd /home/runner/work/OncoVision/OncoVision/SuperCrafting/OncoVision
 docker compose -f compose.yml up -d
 ```
 
