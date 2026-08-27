@@ -96,7 +96,7 @@ for router in routers:
         router.register_websockets(app)
     print(f"Router '{router.prefix}' included.")
 print(f"Total of {len(routers)} routers included.")
-print(f"Routes: {[route.path for route in app.routes]}")
+print(f"Routes: {[route.path for route in app.routes if hasattr(route, 'path')]}")
 
 if __name__ == "__main__":
     host = os.getenv("HOST", "127.0.0.1")

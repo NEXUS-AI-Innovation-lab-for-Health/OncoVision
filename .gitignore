@@ -73,3 +73,5 @@ sync.sh
 
 # Env files
 .env
+
+/volumes
